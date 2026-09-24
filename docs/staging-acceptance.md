@@ -84,7 +84,20 @@ real IAM access, TLS handshakes, network routing, or deployment readiness.
   PostgreSQL permissions; it does not establish actual RDS behavior. Existing
   replication-privileged roles are also explicitly rejected. SQLite and PostgreSQL
   reject boolean-to-number replay conflicts, including nested additive fields,
-  and roll back the entire batch. Final image smoke
-  and PostgreSQL 17 parity are pending.
+  and roll back the entire batch.
+- The final Docker image passed independent runtime smoke against PostgreSQL 16:
+  non-root/read-only operation, repeat migrations, restricted runtime credentials,
+  owner bootstrap, real HTTP SDK ingestion, metrics persistence after API restart,
+  and revoked-key rejection. The harness was corrected to rediscover Docker's
+  ephemeral host port after restart. Its disposable containers/network were removed.
+- The repaired smoke harness passed again on September 24 against the cached
+  `traceworth:staging-acceptance` image (`903fe68fa3a3`) and `postgres:16-alpine`.
+  The restart check uses the newly published port and the existing authenticated
+  client, then confirms persisted metrics and revoked-key rejection.
+- PostgreSQL 17 acceptance passed in [GitHub run 36044809499](https://github.com/AlexOrdonez11/TraceWorth/actions/runs/36044809499)
+  for commit `525d82b25c05c15ab3c774f2d05e5ef6d9c58000`. That run also passed all
+  three Python versions, React checks, and the isolated wheel smoke. Its container
+  and Terraform jobs failed; their repaired hosted checks remain pending. The
+  local PostgreSQL 16 smoke does not establish a hosted container pass.
 
 See `staging-usability-review.md` for separately scoped onboarding/browser evidence.

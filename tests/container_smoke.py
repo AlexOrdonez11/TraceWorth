@@ -86,6 +86,9 @@ def main():
                 assert report['input']['valid_events'] == 4, report['input']
                 assert report['cohorts'][0]['costs'][0]['amount'] == '0.02'
                 docker('restart', api)
+                # Docker can allocate a different ephemeral host port on restart.
+                url = 'http://' + docker('port', api, '8000/tcp').splitlines()[0]
+                client.base_url = url
                 ready()
                 assert client.get('/api/metrics').json()['report']['input']['valid_events'] == 4
                 assert client.delete(f'/api/applications/{app_id}/keys/{key.json()["key"]["id"]}', headers=csrf).status_code == 204

@@ -42,6 +42,18 @@ AWS resources. Provider downloads require internet access. A real plan uses AWS
 read APIs; an apply changes AWS resources. Never treat validate as a deployment
 test.
 
+When updating the provider version, regenerate both platform hashes in each
+stack before committing its lockfile. Windows development and Linux CI must
+both be able to validate the installed package with a read-only lockfile:
+
+```powershell
+terraform -chdir=infra/bootstrap providers lock -platform=windows_amd64 -platform=linux_amd64
+terraform -chdir=infra/staging providers lock -platform=windows_amd64 -platform=linux_amd64
+```
+
+These commands download official provider packages; they do not provision AWS
+resources. Commit the resulting lockfiles with the provider change.
+
 ## Design limits to review before apply
 
 - One NAT gateway and Single-AZ RDS accept staging outages. NAT, ALB, RDS, WAF,

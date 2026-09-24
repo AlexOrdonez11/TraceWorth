@@ -17,6 +17,15 @@ Initial blocking findings: dashboard hardcodes a loopback SDK endpoint and offer
 signup/demo unconditionally; cloud reports need visible query bounds. Final
 evidence belongs in `staging-acceptance.md` and `staging-usability-review.md`.
 
+Final CI recovery is limited to two verification defects: the container smoke
+client must rediscover Docker's published port after restart, and the Terraform
+lockfiles must include the Linux provider package hash used by GitHub runners.
+The tester owns the smoke retest and acceptance record; the developer owns the
+provider lockfiles; the coordinator owns publication and hosted verification.
+The reviewer checks the deployment guide's claims. Existing browser evidence
+remains scoped to the unchanged local UI. Acceptance requires all eight hosted
+jobs to pass on the final code revision; an AWS deployment is a separate gate.
+
 ## CI milestone — September 24, 2026
 
 Scope: automated checks for the existing application, with no AWS deployment.
@@ -29,8 +38,8 @@ Scope: automated checks for the existing application, with no AWS deployment.
 | Integration and Linux baseline | Coordinator | Minimum Python version exercised on Linux; publish readiness and limitations recorded |
 
 See [CI guide](ci.md) for activation, reading failures, and future deployment
-steps. Docker/PostgreSQL and Terraform gates will accompany their respective
-implementations. Earlier milestone records below remain historical.
+steps. Docker/PostgreSQL and Terraform gates are covered by the staging
+foundation milestone above. Earlier milestone records below remain historical.
 
 This is the working protocol for the coordinator, developer, testing, and
 usability-review agents.
