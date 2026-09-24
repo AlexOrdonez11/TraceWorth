@@ -104,6 +104,12 @@ real IAM access, TLS handshakes, network routing, or deployment readiness.
   package hashes. Independent diff review confirmed the expected Linux hash was
   added without changing the AWS provider version or existing checksums. After
   this change, Terraform formatting, both validations, and all five mock tests
-  passed again locally. The final hosted Terraform rerun remains pending.
+  passed again locally.
+- All eight hosted jobs passed in [GitHub run 36047121331](https://github.com/AlexOrdonez11/TraceWorth/actions/runs/36047121331)
+  for implementation commit `ebee3c73949ff3541a8c87082fa3fa0d6b0dde5e`:
+  Python 3.10/3.12/3.14, React typechecks/builds, isolated wheel installation,
+  PostgreSQL 17 acceptance, Linux container runtime smoke, and Terraform offline
+  checks. This accepts the local staging foundation; AWS deployment and the
+  real-cloud gates in `staging-setup.md` remain untested.
 
 See `staging-usability-review.md` for separately scoped onboarding/browser evidence.

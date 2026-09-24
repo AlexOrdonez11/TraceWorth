@@ -26,6 +26,13 @@ The reviewer checks the deployment guide's claims. Existing browser evidence
 remains scoped to the unchanged local UI. Acceptance requires all eight hosted
 jobs to pass on the final code revision; an AWS deployment is a separate gate.
 
+Status: accepted locally on September 24. Both CI defects were fixed and
+independently retested; all eight hosted jobs passed for implementation commit
+`ebee3c7` in [run 36047121331](https://github.com/AlexOrdonez11/TraceWorth/actions/runs/36047121331).
+See the acceptance and usability records for exact scope. No AWS resources were
+provisioned. The next milestone starts with a reviewed concrete Terraform plan
+and then requires the documented real-cloud acceptance checks.
+
 ## CI milestone — September 24, 2026
 
 Scope: automated checks for the existing application, with no AWS deployment.
