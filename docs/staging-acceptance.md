@@ -96,8 +96,14 @@ real IAM access, TLS handshakes, network routing, or deployment readiness.
   client, then confirms persisted metrics and revoked-key rejection.
 - PostgreSQL 17 acceptance passed in [GitHub run 36044809499](https://github.com/AlexOrdonez11/TraceWorth/actions/runs/36044809499)
   for commit `525d82b25c05c15ab3c774f2d05e5ef6d9c58000`. That run also passed all
-  three Python versions, React checks, and the isolated wheel smoke. Its container
-  and Terraform jobs failed; their repaired hosted checks remain pending. The
-  local PostgreSQL 16 smoke does not establish a hosted container pass.
+  three Python versions, React checks, and the isolated wheel smoke.
+- The repaired container smoke passed on Linux in [GitHub run 36046591880](https://github.com/AlexOrdonez11/TraceWorth/actions/runs/36046591880)
+  for commit `4b41c8389d4678bd94e4f3c7c5bd5b1d8ff4bfee`. All seven non-Terraform
+  jobs passed, including PostgreSQL 17 acceptance again.
+- Both provider lockfiles now include Terraform-generated Linux and Windows
+  package hashes. Independent diff review confirmed the expected Linux hash was
+  added without changing the AWS provider version or existing checksums. After
+  this change, Terraform formatting, both validations, and all five mock tests
+  passed again locally. The final hosted Terraform rerun remains pending.
 
 See `staging-usability-review.md` for separately scoped onboarding/browser evidence.
