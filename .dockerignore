@@ -1,0 +1,22 @@
+# Deliberately exclude credentials, telemetry, local databases, VCS, and frontend deps.
+**
+!Dockerfile
+!pyproject.toml
+!README.md
+!src/
+!src/**
+src/**/__pycache__/
+src/**/*.pyc
+src/**/*.egg-info/
+
+**/.env*
+**/*.db
+**/*.sqlite*
+**/*.jsonl
+**/.aws/
+**/*.pem
+**/*.key
+**/*.p12
+**/*.pfx
+**/id_rsa
+**/id_ed25519

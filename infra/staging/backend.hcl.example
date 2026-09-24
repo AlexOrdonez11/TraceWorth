@@ -1,0 +1,6 @@
+bucket       = "traceworth-staging-state-REPLACE_WITH_ACCOUNT_ID"
+key          = "staging/terraform.tfstate"
+region       = "us-east-2"
+encrypt      = true
+use_lockfile = true
+# Use AWS_PROFILE=traceworth-staging; never place credentials in this file.

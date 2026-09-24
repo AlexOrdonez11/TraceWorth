@@ -59,6 +59,7 @@ crash.log
 crash.*.log
 .terraformrc
 terraform.rc
+backend.hcl
 
 # Logs and local editor/operating-system files
 *.log

@@ -1,5 +1,22 @@
 # Local MVP agent workflow
 
+## Staging foundation milestone — September 24, 2026
+
+Scope: locally verified Docker/PostgreSQL support and reviewable Terraform for
+the generated CloudFront hostname in us-east-2. No AWS apply or deployment is
+part of this implementation. Existing SQLite and SDK flows must remain intact.
+
+| Task | File owner | Acceptance |
+| --- | --- | --- |
+| PostgreSQL, migrations, config, container | Developer: backend, pyproject, Dockerfile, compose | Explicit migrations, non-root image, readiness, persistence, secure cloud defaults |
+| Independent acceptance | Tester: tests and staging acceptance record | SQLite regressions, real PostgreSQL isolation/atomicity/replay, image and restart checks |
+| Terraform and integration | Coordinator: infra, CI, dashboard, guides | Offline validate, private network/data, scoped IAM, remote state preparation, no cloud mutation |
+| Onboarding and browser | Reviewer: staging usability record | Real browser flows, correct SDK endpoint, clear disabled features and query bounds |
+
+Initial blocking findings: dashboard hardcodes a loopback SDK endpoint and offers
+signup/demo unconditionally; cloud reports need visible query bounds. Final
+evidence belongs in `staging-acceptance.md` and `staging-usability-review.md`.
+
 ## CI milestone — September 24, 2026
 
 Scope: automated checks for the existing application, with no AWS deployment.

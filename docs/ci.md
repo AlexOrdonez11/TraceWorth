@@ -15,12 +15,17 @@ the default branch. Job names in the workflow are the source of truth.
 | Python tests on Ubuntu, Python 3.10/3.12/3.14 | SDK behavior, schema, accounting, local web server, FastAPI account isolation and HTTP delivery |
 | React checks on Node.js 22 | Install from package-lock.json with npm ci, type-check and build both applications |
 | Python distribution smoke check | Build a wheel and test installation and CLI/static resources outside the source checkout |
+| PostgreSQL 17 acceptance | Real account isolation, transactional/replay behavior, migrations and cloud policy cases |
+| Container smoke | Non-root image, explicit administration, SDK ingestion, API restart persistence and revocation |
+| Terraform offline checks | Formatting, provider validation and mock-provider security assertions without AWS access |
 
-The workflow installs both backend and test extras. Its database tests currently
-exercise **SQLite**, not PostgreSQL. Live ingestion tests use an ephemeral local
+The workflow installs backend and test extras. The Python matrix exercises SQLite;
+a separate PostgreSQL 17 service job runs parity and database-specific cases.
+Live ingestion tests use an ephemeral local
 HTTP server with generated test accounts/keys; no AWS credentials are needed.
-There are no Docker, PostgreSQL or Terraform checks yet because their deployment
-files/support have not been implemented. Add these gates with those milestones.
+The staging foundation adds container build/runtime persistence checks and
+Terraform formatting, validation and mock-provider plan tests. Those checks use
+no AWS credentials and perform no cloud deployment.
 CI does not replace browser acceptance of UI changes.
 
 ## Reading the result
@@ -90,7 +95,10 @@ created by the current CI workflow.
 September 24, 2026: independent testing passed 78 tests without skips on Windows
 Python 3.14, npm ci/typecheck/build, actionlint 1.7.12, and isolated wheel smoke.
 Coordinator independently passed all 78 tests on Linux Python 3.10 in Docker.
-Python 3.12 and the complete GitHub-hosted matrix await the first remote run.
+The original five GitHub checks passed for initial commit `b04ef9f`
+([run](https://github.com/AlexOrdonez11/TraceWorth/actions/runs/36037209637)).
+New staging checks require their own commit's run; this earlier result does not
+validate the new implementation.
 
 The initial minimum-version Linux check exposed a Python 3.10 JSON parser
 RecursionError for deeply nested malformed input. Upload and file readers now

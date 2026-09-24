@@ -1,0 +1,3 @@
+aws_region          = "us-east-2"
+expected_account_id = "REPLACE_WITH_12_DIGIT_ACCOUNT_ID"
+state_bucket_name   = "traceworth-staging-state-REPLACE_WITH_ACCOUNT_ID"

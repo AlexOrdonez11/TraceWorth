@@ -9,6 +9,8 @@ keys, and metrics. Automatic provider integrations remain planned.
 
 ## Documentation
 
+- [Docker and AWS staging preparation](docs/staging-setup.md): PostgreSQL,
+  container deployment, Terraform explained, and the pre-deployment gates.
 - [CI and deployment workflow](docs/ci.md): automated checks, local verification,
   and the path to manually triggered AWS releases.
 - [Run the local web apps](docs/local-web.md): website, account setup, applications,
