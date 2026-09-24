@@ -1,0 +1,72 @@
+# Python environments, packages, and caches
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+
+# Build output and JavaScript dependencies/caches
+build/
+dist/
+node_modules/
+.vite/
+coverage/
+*.tsbuildinfo
+
+# Local telemetry and databases (including SQLite sidecar files)
+*.jsonl
+!tests/fixtures/**/*.jsonl
+local-demo/
+local-data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite-*
+*.sqlite3
+*.sqlite3-*
+
+# Local configuration and credentials; keep safe example configuration
+.env
+.env.*
+!.env.example
+.aws/
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# Terraform local state, variable values, and generated plans
+# Commit .tf source and .terraform.lock.hcl for reproducible deployments.
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+*.tfvars.json
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+.terraformrc
+terraform.rc
+
+# Logs and local editor/operating-system files
+*.log
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+Desktop.ini

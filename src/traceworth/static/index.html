@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>TraceWorth — Know what useful AI costs</title><meta name="description" content="Connect Python workflow execution, recorded costs, and outcomes. Explore your AI application's performance locally with TraceWorth."><link rel="icon" href="/favicon.svg"><link rel="stylesheet" href="/styles.css"></head>
+<body class="landing"><a class="skip" href="#main">Skip to content</a>
+<header class="site-header wrap"><a class="brand" href="/" aria-label="TraceWorth home"><img src="/favicon.svg" alt="" width="32" height="32">TraceWorth<span class="brand-tag">LOCAL</span></a><nav aria-label="Main navigation"><a href="#how-it-works">How it works</a><a href="#get-started">Python SDK</a><a class="button dark small" href="/dashboard">Open dashboard <span aria-hidden="true">↗</span></a></nav></header>
+<main id="main"><section class="hero wrap"><div class="hero-copy"><div class="eyebrow"><span class="small-line"></span> EVIDENCE FOR BETTER AI</div><h1>Your workflows.<br>Recorded costs.<br><span>A clearer picture.</span></h1><p class="hero-description">Follow the work behind an AI result. Connect execution, recorded usage, and outcomes to see what deserves a closer look.</p><div class="hero-actions"><a class="button dark" href="/dashboard">Explore your metrics <span aria-hidden="true">↗</span></a><a class="text-link" href="#get-started">Start with Python <span aria-hidden="true">→</span></a></div><p class="quiet">Runs on your machine. No account or API key required.</p></div>
+<div class="hero-visual" aria-label="Illustrative workflow cost breakdown"><div class="visual-head"><span class="eyebrow">WORKFLOW / REPAIR REQUEST</span><span class="pill lime">Illustrative example</span></div><div class="visual-total"><span>Recorded cost</span><strong>$0.05<span>USD</span></strong><p>One request. The whole recorded story.</p></div><div class="trace-line"><span class="trace-icon">01</span><div><strong>Understand the request</strong><small>Input processing</small></div><span class="mono">$0.01</span></div><div class="trace-line"><span class="trace-icon">02</span><div><strong>Generate repair steps</strong><small>Model response</small></div><span class="mono">$0.02</span></div><div class="trace-line"><span class="trace-icon orange">↻</span><div><strong>Try again</strong><small>Cost that adds up</small></div><span class="mono">$0.02</span></div><div class="visual-note"><span aria-hidden="true">↳</span> Completion is a signal. Acceptance is another.</div></div></section>
+<section class="principles wrap" aria-label="Product principles"><span>APPLICATION-INDEPENDENT BY DESIGN</span><p>Python workflows</p><p>Recorded usage</p><p>Explicit outcomes</p><p>Local analysis</p></section>
+<section id="how-it-works" class="how wrap"><div class="section-intro"><div class="eyebrow">FROM EXECUTION TO EVIDENCE</div><h2>Find the story<br>behind the total.</h2><p>A fast response isn't always a useful result. Start with the facts your application can actually measure.</p></div><div class="feature-list"><article><span class="feature-number">01</span><div><h3>Follow the recorded path</h3><p>Follow nested operations, failures, and explicit retries through the same workflow.</p></div></article><article><span class="feature-number">02</span><div><h3>Put usage next to outcomes</h3><p>See recorded costs and user acceptance together. Keep unknown prices and missing feedback visible.</p></div></article><article><span class="feature-number">03</span><div><h3>Investigate with evidence</h3><p>Follow each finding back to its steps. Use that evidence to choose your next experiment.</p></div></article></div></section>
+<section id="get-started" class="sdk-section wrap"><div><div class="eyebrow">A SMALL INTEGRATION. A USEFUL START.</div><h2>Your application.<br>One shared library.</h2><p>Add workflow boundaries and record usage from provider responses. Export local events and explore them in the dashboard.</p><p class="quiet">Automatic provider capture is planned. Today, usage is recorded explicitly.</p></div><div class="code-card"><div class="code-title"><span>app.py</span><span>PYTHON</span></div><pre><code>from traceworth import TraceWorth, JsonlExporter
+
+trace = TraceWorth(
+    "my-application",
+    JsonlExporter("events.jsonl"),
+)
+
+@trace.workflow("answer_request")
+def answer_request():
+    with trace.span("model_call"):
+        # Example only: use actual response usage.
+        trace.record_usage(
+            "provider", "model",
+            {"input_tokens": 100},
+        )
+
+# At application shutdown:
+trace.close()</code></pre><div class="code-footer">Connect the file: <code>traceworth serve --events events.jsonl</code></div></div></section>
+<section class="bottom-cta wrap"><div><div class="eyebrow">START WITH WHAT YOU CAN SEE</div><h2>Make your next change<br>an informed one.</h2></div><a class="button lime-button" href="/dashboard">Open local dashboard <span aria-hidden="true">↗</span></a></section></main>
+<footer class="wrap footer"><a class="brand" href="/"><img src="/favicon.svg" alt="" width="24" height="24">TraceWorth</a><span>Local MVP · Recorded evidence, clear limits.</span><a href="/dashboard">Dashboard ↗</a></footer></body></html>

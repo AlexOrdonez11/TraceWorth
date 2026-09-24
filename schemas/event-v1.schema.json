@@ -1,0 +1,421 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://traceworth.local/schemas/event-v1.schema.json",
+  "title": "TraceWorth event version 1",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "const": 1,
+      "type": "integer"
+    },
+    "event_id": {
+      "type": "string",
+      "format": "uuid",
+      "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+    },
+    "event_type": {
+      "enum": [
+        "step.started",
+        "step.finished",
+        "usage.recorded",
+        "outcome.recorded"
+      ]
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}[Tt]\\d{2}:\\d{2}:\\d{2}(?:\\.\\d+)?(?:[Zz]|[+-](?:[01]\\d|2[0-3]):[0-5]\\d)$"
+    },
+    "application_id": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "environment": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "configuration_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "workflow_id": {
+      "type": "string",
+      "pattern": "\\S"
+    },
+    "step_id": {
+      "anyOf": [
+        {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "event_id",
+    "event_type",
+    "occurred_at",
+    "application_id",
+    "environment",
+    "configuration_id",
+    "workflow_id",
+    "step_id"
+  ],
+  "oneOf": [
+    {
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "kind": {
+          "enum": [
+            "workflow",
+            "operation"
+          ]
+        },
+        "parent_step_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempt_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "event_type": {
+          "const": "step.started"
+        },
+        "step_id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "parent_step_id",
+        "attempt_number",
+        "event_type",
+        "step_id"
+      ]
+    },
+    {
+      "properties": {
+        "name": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "kind": {
+          "enum": [
+            "workflow",
+            "operation"
+          ]
+        },
+        "parent_step_id": {
+          "anyOf": [
+            {
+              "type": "string",
+              "format": "uuid",
+              "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "attempt_number": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "status": {
+          "enum": [
+            "completed",
+            "failed",
+            "cancelled"
+          ]
+        },
+        "error_category": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "duration_ms": {
+          "type": "number",
+          "minimum": 0
+        },
+        "event_type": {
+          "const": "step.finished"
+        },
+        "step_id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        }
+      },
+      "required": [
+        "name",
+        "kind",
+        "parent_step_id",
+        "attempt_number",
+        "status",
+        "error_category",
+        "duration_ms",
+        "event_type",
+        "step_id"
+      ]
+    },
+    {
+      "properties": {
+        "provider": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "model_or_service": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "usage_units": {
+          "type": "object",
+          "minProperties": 1,
+          "propertyNames": {
+            "type": "string",
+            "pattern": "\\S"
+          },
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0
+          }
+        },
+        "amount": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[0-9]+(?:\\.[0-9]+)?$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "^[A-Z]{3}$"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "cost_basis": {
+          "enum": [
+            "provider_reported",
+            "estimated",
+            "allocated",
+            null
+          ]
+        },
+        "price_version": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "event_type": {
+          "const": "usage.recorded"
+        },
+        "step_id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$"
+        }
+      },
+      "required": [
+        "provider",
+        "model_or_service",
+        "usage_units",
+        "amount",
+        "currency",
+        "cost_basis",
+        "price_version",
+        "event_type",
+        "step_id"
+      ]
+    },
+    {
+      "properties": {
+        "outcome_type": {
+          "type": "string",
+          "pattern": "\\S"
+        },
+        "value": {
+          "type": [
+            "boolean",
+            "string",
+            "number"
+          ]
+        },
+        "evaluator_version": {
+          "anyOf": [
+            {
+              "type": "string",
+              "pattern": "\\S"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "event_type": {
+          "const": "outcome.recorded"
+        }
+      },
+      "required": [
+        "outcome_type",
+        "value",
+        "evaluator_version",
+        "event_type"
+      ]
+    }
+  ],
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "enum": [
+              "step.started",
+              "step.finished"
+            ]
+          },
+          "kind": {
+            "const": "workflow"
+          }
+        },
+        "required": [
+          "kind"
+        ]
+      },
+      "then": {
+        "properties": {
+          "parent_step_id": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "step.finished"
+          },
+          "status": {
+            "const": "completed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "properties": {
+          "error_category": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "usage.recorded"
+          },
+          "amount": {
+            "type": "null"
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      },
+      "then": {
+        "properties": {
+          "currency": {
+            "type": "null"
+          },
+          "cost_basis": {
+            "type": "null"
+          },
+          "price_version": {
+            "type": "null"
+          }
+        }
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "event_type": {
+            "const": "usage.recorded"
+          },
+          "amount": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "amount"
+        ]
+      },
+      "then": {
+        "properties": {
+          "currency": {
+            "type": "string",
+            "pattern": "^[A-Z]{3}$"
+          },
+          "cost_basis": {
+            "enum": [
+              "provider_reported",
+              "estimated",
+              "allocated"
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

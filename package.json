@@ -1,0 +1,19 @@
+{
+  "name": "traceworth-workspace",
+  "private": true,
+  "workspaces": ["apps/website", "apps/dashboard"],
+  "scripts": {
+    "dev:website": "npm run dev --workspace @traceworth/website",
+    "dev:dashboard": "npm run dev --workspace @traceworth/dashboard",
+    "build": "npm run build --workspaces",
+    "typecheck": "npm run typecheck --workspaces"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "typescript": "~5.9.3",
+    "vite": "8.3.0"
+  },
+  "engines": {"node": ">=22.12.0"}
+}

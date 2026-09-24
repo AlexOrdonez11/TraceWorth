@@ -1,0 +1,102 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Python ${{ matrix.python-version }} tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ['3.10', '3.12', '3.14']
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install SDK, backend, and test dependencies
+        run: python -m pip install -e '.[backend,test]'
+      - name: Run full Python acceptance suite
+        run: python -m unittest discover -s tests -v
+
+  frontend:
+    name: React typecheck and production builds
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - name: Install locked workspace dependencies
+        run: npm ci
+      - name: Check TypeScript in both applications
+        run: npm run typecheck
+      - name: Build website and dashboard
+        run: npm run build
+
+  package:
+    name: Wheel build and isolated installation smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Set up Python
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0
+        with:
+          python-version: '3.12'
+      - name: Build wheel
+        run: python -m pip wheel --no-deps --wheel-dir dist .
+      - name: Install wheel and exercise SDK without backend dependencies
+        shell: bash
+        run: |
+          python -m venv "$RUNNER_TEMP/wheel-smoke"
+          smoke_python="$RUNNER_TEMP/wheel-smoke/bin/python"
+          "$smoke_python" -m pip install --no-deps --no-index dist/traceworth-*.whl
+          cd "$(mktemp -d "$RUNNER_TEMP/traceworth-smoke.XXXXXX")"
+          unset PYTHONPATH
+          "$RUNNER_TEMP/wheel-smoke/bin/traceworth" --help
+          "$smoke_python" -m traceworth demo --output events.jsonl
+          "$smoke_python" -m traceworth assess events.jsonl --format json --output report.json
+          "$smoke_python" - <<'PY'
+          import json
+          from importlib.resources import files
+          from traceworth import HttpExporter, JsonlExporter, TraceWorth
+
+          with open('report.json', encoding='utf-8') as source:
+              report = json.load(source)
+          assert report['input']['valid_events'] > 0, report['input']
+          assert report['input']['invalid_lines'] == 0, report['input']
+          assert len(report['cohorts']) == 3, report['cohorts']
+          for asset in ('index.html', 'dashboard.html', 'styles.css', 'app.js', 'favicon.svg'):
+              assert files('traceworth').joinpath('static', asset).is_file(), asset
+          assert files('traceworth').joinpath('backend', 'app.py').is_file()
+          print('Installed wheel: SDK, CLI, assessment, and packaged assets passed.')
+          PY
