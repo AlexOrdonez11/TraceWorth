@@ -1,0 +1,12 @@
+output "dashboard_url" { value = "https://${aws_cloudfront_distribution.dashboard.domain_name}" }
+output "dashboard_bucket" { value = aws_s3_bucket.dashboard.id }
+output "distribution_id" { value = aws_cloudfront_distribution.dashboard.id }
+output "ecr_repository_url" { value = aws_ecr_repository.api.repository_url }
+output "cluster_name" { value = aws_ecs_cluster.main.name }
+output "admin_task_definition" { value = try(aws_ecs_task_definition.admin[0].arn, null) }
+output "api_task_definition" { value = try(aws_ecs_task_definition.api[0].arn, null) }
+output "runtime_database_secret_arn" { value = aws_secretsmanager_secret.runtime_database.arn }
+output "bootstrap_secret_arn" { value = aws_secretsmanager_secret.bootstrap.arn }
+output "private_subnets" { value = aws_subnet.private[*].id }
+output "task_security_group" { value = aws_security_group.api.id }
+output "database_endpoint" { value = aws_db_instance.main.address }

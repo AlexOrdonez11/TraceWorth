@@ -1,0 +1,54 @@
+# Local disposable PostgreSQL parity stack only. Supply a test-only password via
+# TRACEWORTH_COMPOSE_DB_PASSWORD in your shell; never reuse cloud credentials.
+# Explicitly run: docker compose run --rm migrate
+# Then: docker compose up -d api
+x-api-environment: &api-environment
+  TRACEWORTH_MODE: local
+  TRACEWORTH_DB_HOST: postgres
+  TRACEWORTH_DB_NAME: traceworth
+  TRACEWORTH_DB_USER: traceworth_local
+  TRACEWORTH_DB_PASSWORD: ${TRACEWORTH_COMPOSE_DB_PASSWORD:?Set a disposable local test password}
+  TRACEWORTH_DB_SSLMODE: disable
+  TRACEWORTH_ALLOWED_ORIGINS: '["http://127.0.0.1:18767","http://localhost:18767","http://127.0.0.1:18000"]'
+
+services:
+  postgres:
+    image: postgres:17@sha256:d74eeac9a635390a49bc21bd49fccd973de707e2a53a76ac49b552b8712ec46f
+    environment:
+      POSTGRES_DB: traceworth
+      POSTGRES_USER: traceworth_local
+      POSTGRES_PASSWORD: ${TRACEWORTH_COMPOSE_DB_PASSWORD:?Set a disposable local test password}
+    ports:
+      - '127.0.0.1:${TRACEWORTH_COMPOSE_DB_PORT:-15432}:5432'
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, 'pg_isready -U traceworth_local -d traceworth']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  migrate:
+    build: .
+    image: traceworth-local:staging
+    command: [migrate]
+    environment: *api-environment
+    profiles: [tools]
+    depends_on:
+      postgres:
+        condition: service_healthy
+  api:
+    build: .
+    image: traceworth-local:staging
+    environment: *api-environment
+    ports:
+      - '127.0.0.1:${TRACEWORTH_COMPOSE_API_PORT:-18000}:8000'
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs: [/tmp]
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+
+volumes:
+  postgres-data:

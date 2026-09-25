@@ -46,7 +46,8 @@ local MVP guide for commands and current limits.
 - `apps/website` is the React entry/marketing application, port 18768.
 - `apps/dashboard` is the React account workspace, port 18767; its development
   `/api` proxy targets the Python API on port 18766.
-- `src/traceworth/backend` is the FastAPI + SQLite backend. The core SDK remains
+- `src/traceworth/backend` is the FastAPI backend with local SQLite and explicit
+  PostgreSQL migrations for container staging. The core SDK remains
   independent of backend dependencies. Preserve the legacy `traceworth serve`
   JSONL viewer and CLI unless a requested change explicitly replaces them.
 - Scope every backend data operation to the authenticated account and relevant
@@ -84,3 +85,15 @@ data or credentials. SQLite is persistent local storage, not a durable SDK spool
 The HTTP exporter remains best effort without retries. One owner per account,
 no recovery/invitations/email verification, and no production deployment are the
 current boundaries; do not imply stronger guarantees in UI or documentation.
+
+## Staging foundation
+
+- Follow `docs/staging-setup.md` for Docker/PostgreSQL and Terraform commands.
+  Offline validation is not a cloud deployment or an AWS acceptance test.
+- Keep database migrations and owner/runtime-role bootstrap explicit, separate
+  from API startup. Runtime containers must not receive master credentials.
+- Preserve bounded received-time reports and partial-data indicators. Test
+  PostgreSQL behavior on a disposable server with `TRACEWORTH_TEST_POSTGRES_DSN`;
+  skipped integration cases do not count as a passing PostgreSQL gate.
+- Terraform applies require a reviewed concrete plan. Never commit state,
+  real tfvars, secrets or generated telemetry. Keep provider lockfiles tracked.

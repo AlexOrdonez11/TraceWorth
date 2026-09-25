@@ -9,12 +9,13 @@ from threading import Thread
 import time
 import tempfile
 import unittest
+from unittest.mock import patch
 
 from fastapi.testclient import TestClient
 import uvicorn
 from traceworth import HttpExporter, TraceWorth
 from traceworth.backend import create_app
-from test_mvp_acceptance import span, usage
+from test_mvp_acceptance import span, usage, outcome
 
 ORIGIN = 'http://localhost:5173'
 PASSWORD = 'local-test-password-123!'
@@ -76,7 +77,7 @@ class BackendAcceptanceTests(unittest.TestCase):
         self.assertEqual({a['id'] for a in bob['applications']}, {self.bob_app['id']})
 
     def test_anonymous_and_ingestion_key_cannot_read_metrics(self):
-        with TestClient(self.app) as anonymous:
+        with closing(TestClient(self.app)) as anonymous:
             self.assertEqual(anonymous.get('/api/metrics').status_code, 401)
             self.assertEqual(anonymous.get('/api/applications').status_code, 401)
             self.assertEqual(anonymous.get('/api/metrics', headers={'Authorization': 'Bearer ' + self.alice_key['token']}).status_code, 401)
@@ -122,7 +123,7 @@ class BackendAcceptanceTests(unittest.TestCase):
         response = self.alice.post('/api/auth/logout', headers=self.alice_csrf)
         self.assertIn(response.status_code, [200, 204], response.text)
         self.assertEqual(self.alice.get('/api/auth/me').status_code, 401)
-        with TestClient(self.app) as replay:
+        with closing(TestClient(self.app)) as replay:
             replay.cookies.set('traceworth_session', stolen_cookie)
             self.assertEqual(replay.get('/api/metrics').status_code, 401)
         self.assertEqual(self.bob.get('/api/auth/me').status_code, 200)
@@ -150,6 +151,23 @@ class BackendAcceptanceTests(unittest.TestCase):
         response = self.alice.post('/api/applications', json={'name': 'blocked', 'slug': 'blocked'},
                                    headers=[(b'x-csrf-token', b'\xff')])
         self.assertEqual(response.status_code, 403, response.text)
+
+    def test_replay_preserves_json_boolean_types_and_atomicity(self):
+        for nested in (False, True):
+            with self.subTest(nested=nested):
+                original = outcome(True)
+                if nested:
+                    original['extra_context'] = {'flags': [True]}
+                self.assertEqual(self.ingest(self.alice_key, [original]).status_code, 200)
+                changed = copy.deepcopy(original)
+                if nested:
+                    changed['extra_context']['flags'][0] = 1
+                else:
+                    changed['value'] = 1
+                count_before = self.alice.get('/api/metrics').json()['report']['input']['valid_events']
+                response = self.ingest(self.alice_key, span() + [changed])
+                self.assertEqual(response.status_code, 409, response.text)
+                self.assertEqual(self.alice.get('/api/metrics').json()['report']['input']['valid_events'], count_before)
 
     def test_request_size_limit_and_invalid_json_are_controlled(self):
         headers = {'Authorization': 'Bearer ' + self.alice_key['token'], 'Content-Type': 'application/json'}
@@ -215,7 +233,7 @@ class BackendAcceptanceTests(unittest.TestCase):
         self.assertEqual(second_metrics.json()['report']['input']['valid_events'], 2)
 
     def test_auth_rate_limit_blocks_repeated_password_attempts(self):
-        with TestClient(self.app) as anonymous:
+        with closing(TestClient(self.app)) as anonymous:
             statuses = [anonymous.post('/api/auth/login', json={'email': 'alice@example.test',
                           'password': 'invalid-password-123'}).status_code for _ in range(11)]
         self.assertIn(401, statuses)
@@ -252,8 +270,42 @@ class BackendAcceptanceTests(unittest.TestCase):
             listener.close()
         self.assertFalse(thread.is_alive())
 
+    def test_oversized_event_rejects_entire_batch(self):
+        records = span()
+        records[1]['extra'] = 'x' * (64 * 1024)
+        response = self.ingest(self.alice_key, records)
+        self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(self.alice.get('/api/metrics').json()['report']['input']['valid_events'], 0)
+
+    def test_jsonb_incompatible_text_is_rejected_atomically(self):
+        for invalid in ['name\x00hidden', 'name\ud800hidden']:
+            records = span()
+            records[1]['name'] = invalid
+            response = self.alice.post('/api/events', content=json.dumps({'events': records}), headers={'Content-Type': 'application/json', 'Authorization': 'Bearer ' + self.alice_key['token']})
+            self.assertEqual(response.status_code, 422, response.text)
+        self.assertEqual(self.alice.get('/api/metrics').json()['report']['input']['valid_events'], 0)
+
+    def test_metrics_byte_budget_is_explicit_and_bounded(self):
+        records = span()
+        records.append(usage(records[0]['step_id'], '0.2'))
+        self.assertEqual(self.ingest(self.alice_key, records).status_code, 200)
+        with patch('traceworth.backend.app.MAX_METRICS_BYTES', 1000):
+            response = self.alice.get('/api/metrics')
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertTrue(body['scope']['truncated'])
+        self.assertIn('byte_limit', body['scope']['truncation_reasons'])
+        self.assertLessEqual(body['scope']['input_bytes'], 1000)
+        self.assertLess(body['scope']['returned_events'], 3)
+        for cohort in body['report']['cohorts']:
+            self.assertTrue(all(cost['partial'] for cost in cohort['costs']))
+
+    def test_extreme_metrics_date_returns_controlled_error(self):
+        response = self.alice.get('/api/metrics', params={'until': '0001-01-01T00:00:00Z'})
+        self.assertEqual(response.status_code, 422, response.text)
+
     def test_login_password_verification_and_session_cookie_flags(self):
-        with TestClient(self.app) as login:
+        with closing(TestClient(self.app)) as login:
             wrong = login.post('/api/auth/login', json={'email': 'alice@example.test', 'password': 'wrong-password-123'})
             self.assertEqual(wrong.status_code, 401, wrong.text)
             valid = login.post('/api/auth/login', json={'email': 'ALICE@example.test', 'password': PASSWORD})

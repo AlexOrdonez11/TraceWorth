@@ -12,6 +12,7 @@ dependencies = []
 [project.optional-dependencies]
 test = ["jsonschema[format]>=4.18,<5", "httpx>=0.27,<1"]
 backend = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1"]
+postgres = ["psycopg[binary,pool]>=3.2,<4"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

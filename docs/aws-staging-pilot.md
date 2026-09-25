@@ -1,9 +1,12 @@
 # AWS staging pilot: MyHandyAI + TraceWorth
 
-Planning baseline updated September 24, 2026. Proposed infrastructure, not provisioned.
+Baseline updated September 24, 2026. Terraform is implemented under `infra/`;
+resources are not provisioned. Start with [the staging setup guide](staging-setup.md)
+for current Docker/PostgreSQL commands and deployment gates.
 MyHandyAI uses Python on AWS Lambda, as confirmed by the owner. Its repository,
 AWS region, networking, and traffic volume have not yet been inspected.
-Use the same AWS region as its staging backend. The
+TraceWorth staging targets **us-east-2** in its dedicated account. Confirm
+MyHandyAI networking and cross-region latency before integration. The
 recommended architecture assumes a small, team-only pilot, not public SaaS.
 
 ## Preparation checklist: generated CloudFront domain
@@ -57,11 +60,12 @@ Provision with infrastructure as code after cloud compatibility is implemented:
   tasks, database capacity and failed/dropped telemetry. Separate website
   bucket/distribution can follow; it is not needed to test MyHandyAI ingestion.
 
-Cloud code gates remain: PostgreSQL/migrations, container entrypoint, readiness,
-secure-cookie configuration independent of the private HTTP origin hop, trusted
-proxy handling, admin bootstrap/disabled public registration, bounded metrics,
-retention, and Lambda invocation-aware delivery. Current local code does not
-provide these deployment capabilities. Do not create idle billable compute,
+The foundation includes PostgreSQL/versioned migrations, a non-root container,
+readiness, explicit Secure cookies, ignored proxy headers, owner bootstrap,
+disabled cloud signup/demo, bounded metrics and batched retention. Real AWS
+behavior remains unverified. Scheduled retention, Lambda invocation-aware
+delivery, deployed-network checks and backup restore remain release gates.
+Do not create idle billable compute,
 ALB, NAT and database resources before the deployable build is ready.
 
 References:
@@ -147,7 +151,8 @@ retention periods are enforced.
    SQLite for local use. Rerun ownership, atomic batch and replay tests against
    PostgreSQL. Add a non-root container, environment-based settings, cloud
    entrypoint bound to 0.0.0.0, separate liveness/readiness and graceful shutdown.
-   The existing CLI deliberately binds loopback and is not that entrypoint.
+   The default CLI still binds loopback; `serve-container` is the separate
+   environment-configured entrypoint.
 
 3. **Close staging exposure gaps.** Disable public registration and synthetic
    seeding in cloud mode; provide an explicit admin bootstrap for the pilot
@@ -158,10 +163,11 @@ retention periods are enforced.
    Add ingestion quotas/rate limits. Public self-service access requires a
    separate identity lifecycle decision (Cognito is an option, not integrated).
 
-4. **Bound stored-data processing.** The current metrics endpoint loads all
-   account events into memory. Add server-side time windows, query limits and
-   pagination before a sustained staging feed. Preserve complete workflow
-   boundaries or explicitly mark truncated/incomplete data. Add retention jobs.
+4. **Bound stored-data processing.** The metrics endpoint now uses received-time
+   windows, event/byte caps and visible partial-report indicators. It is a
+   bounded snapshot, not a paginated export. Profile it with pilot workloads.
+   Retention deletes bounded batches; schedule and verify repeated execution
+   before sustained telemetry.
 
 5. **Provision with infrastructure as code.** Define the VPC bindings, IAM,
    ECR/ECS/ALB, private RDS, buckets/distributions, secrets, DNS/TLS, alarms and
