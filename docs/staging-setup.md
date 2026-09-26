@@ -1,8 +1,19 @@
 # Staging preparation: Docker, PostgreSQL and Terraform
 
-This milestone prepares deployment files and local acceptance evidence. It does
-not deploy TraceWorth or connect MyHandyAI. AWS is the destination for TraceWorth;
-the SDK remains independent of where the caller runs.
+The Terraform bootstrap and base staging infrastructure were applied on
+September 26, 2026. The AWS resources are present, but the API service still
+has zero running tasks and the dashboard build has not been uploaded. Secrets,
+migrations, the owner account, and MyHandyAI integration remain to be done.
+The SDK remains independent of where the caller runs.
+
+Pausing traffic later stops request-based costs. Setting the API service count
+to zero also stops Fargate task charges, but the database, NAT gateway, load
+balancer, storage, WAF, and secrets continue to bill while provisioned. An RDS
+instance can be [stopped temporarily](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/USER_StopInstance.html);
+AWS automatically restarts it after seven days and charges for storage while
+stopped. Removing the fixed-cost resources
+requires a separately reviewed Terraform change and a database backup plan;
+the protected database and state bucket deliberately resist routine deletion.
 
 ## The pieces in plain language
 
