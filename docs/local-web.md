@@ -43,6 +43,17 @@ allowlist, and changing the API port requires updating the dashboard proxy.
 Backend `--allowed-origin` can be repeated; specifying it replaces the defaults.
 The defaults include localhost/127.0.0.1 on dashboard 18767 and API 18766.
 
+To explore the product before registering or connecting an application, open
+`http://127.0.0.1:18767/#demo` or choose **Explore demo** on the website. This is
+a read-only dashboard preview generated from synthetic sample events. It does
+not create an account, application, key, or telemetry, and its values are not
+live measurements. Exit the preview to sign in or create an empty workspace.
+The website preview lets you switch fictional applications and inspect sample
+workflow costs. The dashboard demo compares recorded cost and usage events per
+workflow; selecting a plotted run opens its detail. Outcome and price-evidence
+charts summarize only generated events. Unpriced usage remains visibly unknown.
+Motion is optional under the browser's reduced-motion preference.
+
 The database path is relative to the process working directory. Reuse the same
 file to retain accounts, applications, keys, sessions, and events across restarts.
 Starting with a different database creates an independent workspace.
@@ -89,7 +100,9 @@ with TraceWorth(
     telemetry.record_outcome('accepted', True, workflow_id=workflow_id)
 ```
 
-Usage stays explicitly recorded; no provider is automatically intercepted.
+This core SDK example records usage explicitly. The optional Lambda adapter can
+capture returned model and token counts from its supported OpenAI calls; see
+[AWS Lambda integration](aws-lambda-integration.md) for versions and limits.
 Unknown prices remain unknown. Only record acceptance when your application has
 an actual acceptance signal; the snippet demonstrates the API rather than a
 quality evaluation.

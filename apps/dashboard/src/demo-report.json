@@ -1,0 +1,707 @@
+{
+  "applications": [
+    {
+      "id": "assistant-service",
+      "name": "Assistant service",
+      "slug": "assistant-service"
+    },
+    {
+      "id": "document-indexer",
+      "name": "Document indexer",
+      "slug": "document-indexer"
+    }
+  ],
+  "report": {
+    "schema_version": 1,
+    "input": {
+      "valid_events": 45,
+      "invalid_lines": 0,
+      "duplicate_events": 0,
+      "errors": []
+    },
+    "cohorts": [
+      {
+        "application_id": "assistant-service",
+        "environment": "synthetic-demo",
+        "configuration_id": "sample-v1",
+        "observed_time_range": {
+          "start": "2026-01-15T12:00:00+00:00",
+          "end": "2026-01-15T12:00:00.270000+00:00"
+        },
+        "acceptance_cutoff_at": "2026-01-15T12:00:00.270000+00:00",
+        "summary": {
+          "workflows": 3,
+          "steps": 10,
+          "completed_workflows": 3,
+          "failed_workflows": 0,
+          "cancelled_workflows": 0,
+          "failed_steps": 1,
+          "cancelled_steps": 0,
+          "retry_steps": 1,
+          "accepted_workflows": 1,
+          "outcome_workflows": 2,
+          "incomplete_steps": 0,
+          "orphan_steps": 0,
+          "usage_events": 6,
+          "known_cost_events": 3,
+          "unknown_cost_events": 3
+        },
+        "costs": [
+          {
+            "currency": "USD",
+            "cost_basis": "estimated",
+            "amount": "0.049",
+            "cost_per_accepted_result": "0.049",
+            "partial": true
+          }
+        ],
+        "workflows": [
+          {
+            "workflow_id": "00000000-0000-0000-0000-000000000002",
+            "status": "completed",
+            "duration_ms": 101.0,
+            "missing_root": false,
+            "ambiguous_root": false,
+            "accepted": true,
+            "acceptance_event_id": "00000000-0000-0000-0000-00000000000d",
+            "incomplete_telemetry": false,
+            "steps": [
+              {
+                "name": "answer_question",
+                "kind": "workflow",
+                "parent_step_id": null,
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-000000000003",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00+00:00",
+                "observed_at": "2026-01-15T12:00:00+00:00",
+                "duration_ms": 101.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 0,
+                "usage_events": 0,
+                "unknown_cost_events": 0,
+                "costs": []
+              },
+              {
+                "name": "retrieve_context",
+                "kind": "operation",
+                "parent_step_id": "00000000-0000-0000-0000-000000000003",
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-000000000005",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.010000+00:00",
+                "observed_at": "2026-01-15T12:00:00.010000+00:00",
+                "duration_ms": 89.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 1,
+                "usage_events": 1,
+                "unknown_cost_events": 1,
+                "costs": []
+              },
+              {
+                "name": "generate_answer",
+                "kind": "operation",
+                "parent_step_id": "00000000-0000-0000-0000-000000000003",
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-000000000009",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.040000+00:00",
+                "observed_at": "2026-01-15T12:00:00.040000+00:00",
+                "duration_ms": 98.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 1,
+                "usage_events": 1,
+                "unknown_cost_events": 0,
+                "costs": [
+                  {
+                    "currency": "USD",
+                    "cost_basis": "estimated",
+                    "amount": "0.014",
+                    "cost_per_accepted_result": null,
+                    "partial": false
+                  }
+                ]
+              }
+            ],
+            "costs": [
+              {
+                "currency": "USD",
+                "cost_basis": "estimated",
+                "amount": "0.014",
+                "cost_per_accepted_result": null,
+                "partial": true
+              }
+            ],
+            "usage_events": 2,
+            "unknown_cost_events": 1,
+            "orphan_usage_event_ids": [],
+            "usage": [
+              {
+                "provider": "example-model-provider",
+                "model_or_service": "sample-model-a",
+                "unit": "input_tokens",
+                "value": "420"
+              },
+              {
+                "provider": "example-model-provider",
+                "model_or_service": "sample-model-a",
+                "unit": "output_tokens",
+                "value": "115"
+              },
+              {
+                "provider": "example-search",
+                "model_or_service": "index-v1",
+                "unit": "queries",
+                "value": "1"
+              }
+            ]
+          },
+          {
+            "workflow_id": "00000000-0000-0000-0000-00000000000f",
+            "status": "completed",
+            "duration_ms": 137.0,
+            "missing_root": false,
+            "ambiguous_root": false,
+            "accepted": false,
+            "acceptance_event_id": "00000000-0000-0000-0000-00000000001e",
+            "incomplete_telemetry": false,
+            "steps": [
+              {
+                "name": "answer_question",
+                "kind": "workflow",
+                "parent_step_id": null,
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-000000000010",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.090000+00:00",
+                "observed_at": "2026-01-15T12:00:00.090000+00:00",
+                "duration_ms": 137.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 0,
+                "usage_events": 0,
+                "unknown_cost_events": 0,
+                "costs": []
+              },
+              {
+                "name": "retrieve_context",
+                "kind": "operation",
+                "parent_step_id": "00000000-0000-0000-0000-000000000010",
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-000000000012",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.100000+00:00",
+                "observed_at": "2026-01-15T12:00:00.100000+00:00",
+                "duration_ms": 116.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 1,
+                "usage_events": 1,
+                "unknown_cost_events": 1,
+                "costs": []
+              },
+              {
+                "name": "generate_answer",
+                "kind": "operation",
+                "parent_step_id": "00000000-0000-0000-0000-000000000010",
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-000000000016",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.130000+00:00",
+                "observed_at": "2026-01-15T12:00:00.130000+00:00",
+                "duration_ms": 125.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 1,
+                "usage_events": 1,
+                "unknown_cost_events": 0,
+                "costs": [
+                  {
+                    "currency": "USD",
+                    "cost_basis": "estimated",
+                    "amount": "0.016",
+                    "cost_per_accepted_result": null,
+                    "partial": false
+                  }
+                ]
+              },
+              {
+                "name": "generate_answer",
+                "kind": "operation",
+                "parent_step_id": "00000000-0000-0000-0000-000000000010",
+                "attempt_number": 2,
+                "step_id": "00000000-0000-0000-0000-00000000001a",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.160000+00:00",
+                "observed_at": "2026-01-15T12:00:00.160000+00:00",
+                "duration_ms": 134.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 1,
+                "usage_events": 1,
+                "unknown_cost_events": 0,
+                "costs": [
+                  {
+                    "currency": "USD",
+                    "cost_basis": "estimated",
+                    "amount": "0.019",
+                    "cost_per_accepted_result": null,
+                    "partial": false
+                  }
+                ]
+              }
+            ],
+            "costs": [
+              {
+                "currency": "USD",
+                "cost_basis": "estimated",
+                "amount": "0.035",
+                "cost_per_accepted_result": null,
+                "partial": true
+              }
+            ],
+            "usage_events": 3,
+            "unknown_cost_events": 1,
+            "orphan_usage_event_ids": [],
+            "usage": [
+              {
+                "provider": "example-model-provider",
+                "model_or_service": "sample-model-a",
+                "unit": "input_tokens",
+                "value": "1070"
+              },
+              {
+                "provider": "example-model-provider",
+                "model_or_service": "sample-model-a",
+                "unit": "output_tokens",
+                "value": "208"
+              },
+              {
+                "provider": "example-search",
+                "model_or_service": "index-v1",
+                "unit": "queries",
+                "value": "1"
+              }
+            ]
+          },
+          {
+            "workflow_id": "00000000-0000-0000-0000-000000000020",
+            "status": "completed",
+            "duration_ms": 161.0,
+            "missing_root": false,
+            "ambiguous_root": false,
+            "accepted": null,
+            "acceptance_event_id": null,
+            "incomplete_telemetry": false,
+            "steps": [
+              {
+                "name": "answer_question",
+                "kind": "workflow",
+                "parent_step_id": null,
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-000000000021",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.210000+00:00",
+                "observed_at": "2026-01-15T12:00:00.210000+00:00",
+                "duration_ms": 161.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 0,
+                "usage_events": 0,
+                "unknown_cost_events": 0,
+                "costs": []
+              },
+              {
+                "name": "retrieve_context",
+                "kind": "operation",
+                "parent_step_id": "00000000-0000-0000-0000-000000000021",
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-000000000023",
+                "status": "failed",
+                "started_at": "2026-01-15T12:00:00.220000+00:00",
+                "observed_at": "2026-01-15T12:00:00.220000+00:00",
+                "duration_ms": 149.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 1,
+                "usage_events": 0,
+                "unknown_cost_events": 0,
+                "costs": []
+              },
+              {
+                "name": "generate_answer",
+                "kind": "operation",
+                "parent_step_id": "00000000-0000-0000-0000-000000000021",
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-000000000026",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.240000+00:00",
+                "observed_at": "2026-01-15T12:00:00.240000+00:00",
+                "duration_ms": 158.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 1,
+                "usage_events": 1,
+                "unknown_cost_events": 1,
+                "costs": []
+              }
+            ],
+            "costs": [],
+            "usage_events": 1,
+            "unknown_cost_events": 1,
+            "orphan_usage_event_ids": [],
+            "usage": [
+              {
+                "provider": "example-model-provider",
+                "model_or_service": "sample-model-b",
+                "unit": "input_tokens",
+                "value": "240"
+              },
+              {
+                "provider": "example-model-provider",
+                "model_or_service": "sample-model-b",
+                "unit": "output_tokens",
+                "value": "65"
+              }
+            ]
+          }
+        ],
+        "findings": [
+          {
+            "code": "failed_steps",
+            "message": "Recorded steps failed. Investigate these steps before proposing a change.",
+            "evidence": [
+              "00000000-0000-0000-0000-000000000023"
+            ]
+          },
+          {
+            "code": "retries",
+            "message": "Explicit retry attempts were recorded; compare retry causes and their recorded usage.",
+            "evidence": [
+              "00000000-0000-0000-0000-00000000001a"
+            ]
+          },
+          {
+            "code": "missing_cost",
+            "message": "Observed usage has unknown cost; totals are partial.",
+            "evidence": [
+              "00000000-0000-0000-0000-000000000006",
+              "00000000-0000-0000-0000-000000000013",
+              "00000000-0000-0000-0000-000000000027"
+            ]
+          },
+          {
+            "code": "missing_outcome",
+            "message": "No boolean accepted outcome was recorded for these workflows.",
+            "evidence": [
+              "00000000-0000-0000-0000-000000000020"
+            ]
+          },
+          {
+            "code": "highest_recorded_step_cost",
+            "currency": "USD",
+            "cost_basis": "estimated",
+            "amount": "0.019",
+            "evidence": [
+              "00000000-0000-0000-0000-00000000001a"
+            ],
+            "workflow_ids": [
+              "00000000-0000-0000-0000-00000000000f"
+            ],
+            "message": "Highest directly recorded step cost in this cohort: 0.019 USD (estimated). This ranks observed costs only; it does not establish an optimization opportunity."
+          }
+        ]
+      },
+      {
+        "application_id": "document-indexer",
+        "environment": "synthetic-demo",
+        "configuration_id": "sample-v1",
+        "observed_time_range": {
+          "start": "2026-01-15T12:00:00.280000+00:00",
+          "end": "2026-01-15T12:00:00.440000+00:00"
+        },
+        "acceptance_cutoff_at": "2026-01-15T12:00:00.440000+00:00",
+        "summary": {
+          "workflows": 2,
+          "steps": 6,
+          "completed_workflows": 2,
+          "failed_workflows": 0,
+          "cancelled_workflows": 0,
+          "failed_steps": 0,
+          "cancelled_steps": 0,
+          "retry_steps": 0,
+          "accepted_workflows": 1,
+          "outcome_workflows": 1,
+          "incomplete_steps": 0,
+          "orphan_steps": 0,
+          "usage_events": 4,
+          "known_cost_events": 1,
+          "unknown_cost_events": 3
+        },
+        "costs": [
+          {
+            "currency": "USD",
+            "cost_basis": "estimated",
+            "amount": "0.011",
+            "cost_per_accepted_result": "0.011",
+            "partial": true
+          }
+        ],
+        "workflows": [
+          {
+            "workflow_id": "00000000-0000-0000-0000-00000000002b",
+            "status": "completed",
+            "duration_ms": 185.0,
+            "missing_root": false,
+            "ambiguous_root": false,
+            "accepted": true,
+            "acceptance_event_id": "00000000-0000-0000-0000-000000000036",
+            "incomplete_telemetry": false,
+            "steps": [
+              {
+                "name": "index_document",
+                "kind": "workflow",
+                "parent_step_id": null,
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-00000000002c",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.280000+00:00",
+                "observed_at": "2026-01-15T12:00:00.280000+00:00",
+                "duration_ms": 185.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 0,
+                "usage_events": 0,
+                "unknown_cost_events": 0,
+                "costs": []
+              },
+              {
+                "name": "parse_document",
+                "kind": "operation",
+                "parent_step_id": "00000000-0000-0000-0000-00000000002c",
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-00000000002e",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.290000+00:00",
+                "observed_at": "2026-01-15T12:00:00.290000+00:00",
+                "duration_ms": 173.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 1,
+                "usage_events": 1,
+                "unknown_cost_events": 1,
+                "costs": []
+              },
+              {
+                "name": "embed_sections",
+                "kind": "operation",
+                "parent_step_id": "00000000-0000-0000-0000-00000000002c",
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-000000000032",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.320000+00:00",
+                "observed_at": "2026-01-15T12:00:00.320000+00:00",
+                "duration_ms": 182.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 1,
+                "usage_events": 1,
+                "unknown_cost_events": 0,
+                "costs": [
+                  {
+                    "currency": "USD",
+                    "cost_basis": "estimated",
+                    "amount": "0.011",
+                    "cost_per_accepted_result": null,
+                    "partial": false
+                  }
+                ]
+              }
+            ],
+            "costs": [
+              {
+                "currency": "USD",
+                "cost_basis": "estimated",
+                "amount": "0.011",
+                "cost_per_accepted_result": null,
+                "partial": true
+              }
+            ],
+            "usage_events": 2,
+            "unknown_cost_events": 1,
+            "orphan_usage_event_ids": [],
+            "usage": [
+              {
+                "provider": "example-model-provider",
+                "model_or_service": "sample-embedding-model",
+                "unit": "input_tokens",
+                "value": "1100"
+              },
+              {
+                "provider": "example-parser",
+                "model_or_service": "parser-v1",
+                "unit": "pages",
+                "value": "6"
+              }
+            ]
+          },
+          {
+            "workflow_id": "00000000-0000-0000-0000-000000000038",
+            "status": "completed",
+            "duration_ms": 212.0,
+            "missing_root": false,
+            "ambiguous_root": false,
+            "accepted": null,
+            "acceptance_event_id": null,
+            "incomplete_telemetry": false,
+            "steps": [
+              {
+                "name": "index_document",
+                "kind": "workflow",
+                "parent_step_id": null,
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-000000000039",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.370000+00:00",
+                "observed_at": "2026-01-15T12:00:00.370000+00:00",
+                "duration_ms": 212.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 0,
+                "usage_events": 0,
+                "unknown_cost_events": 0,
+                "costs": []
+              },
+              {
+                "name": "parse_document",
+                "kind": "operation",
+                "parent_step_id": "00000000-0000-0000-0000-000000000039",
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-00000000003b",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.380000+00:00",
+                "observed_at": "2026-01-15T12:00:00.380000+00:00",
+                "duration_ms": 200.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 1,
+                "usage_events": 1,
+                "unknown_cost_events": 1,
+                "costs": []
+              },
+              {
+                "name": "embed_sections",
+                "kind": "operation",
+                "parent_step_id": "00000000-0000-0000-0000-000000000039",
+                "attempt_number": 1,
+                "step_id": "00000000-0000-0000-0000-00000000003f",
+                "status": "completed",
+                "started_at": "2026-01-15T12:00:00.410000+00:00",
+                "observed_at": "2026-01-15T12:00:00.410000+00:00",
+                "duration_ms": 209.0,
+                "incomplete": false,
+                "orphan": false,
+                "conflicting_lifecycle": false,
+                "cycle": false,
+                "depth": 1,
+                "usage_events": 1,
+                "unknown_cost_events": 1,
+                "costs": []
+              }
+            ],
+            "costs": [],
+            "usage_events": 2,
+            "unknown_cost_events": 2,
+            "orphan_usage_event_ids": [],
+            "usage": [
+              {
+                "provider": "example-model-provider",
+                "model_or_service": "sample-embedding-model",
+                "unit": "input_tokens",
+                "value": "780"
+              },
+              {
+                "provider": "example-parser",
+                "model_or_service": "parser-v1",
+                "unit": "pages",
+                "value": "4"
+              }
+            ]
+          }
+        ],
+        "findings": [
+          {
+            "code": "missing_cost",
+            "message": "Observed usage has unknown cost; totals are partial.",
+            "evidence": [
+              "00000000-0000-0000-0000-00000000002f",
+              "00000000-0000-0000-0000-00000000003c",
+              "00000000-0000-0000-0000-000000000040"
+            ]
+          },
+          {
+            "code": "missing_outcome",
+            "message": "No boolean accepted outcome was recorded for these workflows.",
+            "evidence": [
+              "00000000-0000-0000-0000-000000000038"
+            ]
+          },
+          {
+            "code": "highest_recorded_step_cost",
+            "currency": "USD",
+            "cost_basis": "estimated",
+            "amount": "0.011",
+            "evidence": [
+              "00000000-0000-0000-0000-000000000032"
+            ],
+            "workflow_ids": [
+              "00000000-0000-0000-0000-00000000002b"
+            ],
+            "message": "Highest directly recorded step cost in this cohort: 0.011 USD (estimated). This ranks observed costs only; it does not establish an optimization opportunity."
+          }
+        ]
+      }
+    ],
+    "assumptions": [
+      "Only observed events are assessed; missing application executions cannot be detected.",
+      "Acceptance is the latest boolean accepted outcome by timestamp, then event_id, within this file.",
+      "Costs are recorded amounts, separated by currency and basis; no provider prices are inferred.",
+      "Total application coverage is unknown even when partial is false; partial marks detected missing costs or incomplete telemetry. Input errors conservatively mark every cohort partial.",
+      "Cost per accepted result includes recorded costs of failed and unaccepted workflows in the cohort.",
+      "Child durations overlap and are never summed into workflow duration."
+    ]
+  }
+}
