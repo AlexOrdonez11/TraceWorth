@@ -1,9 +1,10 @@
 # TraceWorth staging infrastructure
 
-This directory is a **deployment proposal implemented as Terraform**, not an
-already deployed environment. Read [the staging guide](../docs/staging-setup.md)
-before applying it. Local validation cannot prove AWS permissions, service
-quotas, routing, availability, or the final bill.
+The bootstrap and base staging infrastructure were deployed in us-east-2 on
+September 26, 2026. The API service still has zero running tasks, and the
+dashboard files and database setup are not yet released. Read
+[the staging guide](../docs/staging-setup.md) before changing the stack. Local
+validation cannot prove routing, availability, or the final bill.
 
 - `bootstrap/`: a protected, versioned S3 bucket for Terraform state.
 - `staging/`: the private pilot environment in us-east-2 with a generated

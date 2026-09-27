@@ -1,8 +1,10 @@
 # AWS staging pilot: MyHandyAI + TraceWorth
 
-Baseline updated September 24, 2026. Terraform is implemented under `infra/`;
-resources are not provisioned. Start with [the staging setup guide](staging-setup.md)
-for current Docker/PostgreSQL commands and deployment gates.
+Baseline updated September 26, 2026. Terraform is implemented under `infra/`;
+the base AWS infrastructure is provisioned, while the API and dashboard release
+remain pending. This page retains the original planning context. Start with
+[the staging setup guide](staging-setup.md) for current status, commands, and
+deployment gates.
 MyHandyAI uses Python on AWS Lambda, as confirmed by the owner. Its repository,
 AWS region, networking, and traffic volume have not yet been inspected.
 TraceWorth staging targets **us-east-2** in its dedicated account. Confirm
