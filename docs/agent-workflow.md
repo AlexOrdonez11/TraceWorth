@@ -1,5 +1,33 @@
 # Local MVP agent workflow
 
+## Landing and demo visualization milestone — September 27, 2026
+
+The owner requested a more polished landing page and account-free demo with
+interactive plots, responsive layouts, and animation. Keep all plotted values
+derived from the existing synthetic fixture or explicitly illustrative website
+examples. Preserve the read-only `#demo` route, no API calls, clear unknown-cost
+labels, and the real account workspace behavior. Motion must respect reduced
+motion preferences and must not hide essential information.
+
+| Task | File owner | Acceptance |
+| --- | --- | --- |
+| Landing experience | Coordinator: `apps/website/src/` | Stronger visual hierarchy, responsive navigation, meaningful interactive preview, clear synthetic label and demo CTA |
+| Demo visualizations | Developer: `apps/dashboard/src/` | Interactive chart(s) computed from the static assessment fixture, account-free operation, accessible labels and controls, responsive desktop/mobile layout, reduced-motion behavior |
+| Independent acceptance | Testing agent: test files only | Verify chart values and interactions across both applications, no API calls, reduced-motion/mobile behavior, existing sign-in and modal regression |
+| Usability review | Reviewer: read-only actual browser | Explore website and demo at desktop/mobile widths, keyboard navigation, plot interpretation, animation, synthetic/partial-data caveats and exit recovery |
+
+Status: accepted locally; the dashboard update is published to the existing
+staging CloudFront distribution. The website remains a separate local React app.
+The independent browser suite passed 11/11 journeys; the full local suite passed
+150 tests with 33 PostgreSQL cases skipped because no disposable test server was
+configured. Both React typechecks and builds passed. The reviewer traversed the
+website and dashboard at 1440, 800, 390, and 320 pixels, including keyboard,
+mobile navigation, reduced motion, plot interpretation, and exit recovery. The
+mobile table scroll cue and capture-scope headline were fixed and retested.
+After CloudFront invalidation, the deployed dashboard opened at `/#demo`, its
+plots switched measures and opened workflow detail, both sample applications
+loaded, and the browser made no API requests. No MyHandyAI client was connected.
+
 ## Read-only dashboard demo milestone — September 27, 2026
 
 The owner wants to evaluate TraceWorth itself before connecting MyHandyAI.

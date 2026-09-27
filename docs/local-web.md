@@ -48,6 +48,11 @@ To explore the product before registering or connecting an application, open
 a read-only dashboard preview generated from synthetic sample events. It does
 not create an account, application, key, or telemetry, and its values are not
 live measurements. Exit the preview to sign in or create an empty workspace.
+The website preview lets you switch fictional applications and inspect sample
+workflow costs. The dashboard demo compares recorded cost and usage events per
+workflow; selecting a plotted run opens its detail. Outcome and price-evidence
+charts summarize only generated events. Unpriced usage remains visibly unknown.
+Motion is optional under the browser's reduced-motion preference.
 
 The database path is relative to the process working directory. Reuse the same
 file to retain accounts, applications, keys, sessions, and events across restarts.

@@ -186,12 +186,149 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
         self.page.get_by_role("heading", name="Application overview").wait_for()
         self.assertEqual(sum(method == "POST" and url.endswith("/api/auth/login") for method, url in self.requests), 1)
 
+    def test_demo_plot_switches_measures_and_opens_matching_run(self):
+        self.page.goto(self.base_url + "/#demo")
+        plot = self.page.get_by_role("region", name="What did each run record?")
+        cost = plot.get_by_role("button", name="Recorded cost", exact=True)
+        usage = plot.get_by_role("button", name="Usage events", exact=True)
+        self.assertEqual(cost.get_attribute("aria-pressed"), "true")
+        self.assertEqual(usage.get_attribute("aria-pressed"), "false")
+        self.assertIn("0.014 USD", plot.get_by_role("button", name=re.compile("Inspect Run 1")).inner_text())
+        self.assertIn("0.035 USD", plot.get_by_role("button", name=re.compile("Inspect Run 2")).inner_text())
+        self.assertIn("Unpriced", plot.get_by_role("button", name=re.compile("Inspect Run 3")).inner_text())
+        self.assertIn("partial", plot.inner_text().lower())
+        self.assertIn("2 of 3 workflows", self.page.get_by_role("region", name="What can we actually conclude?").inner_text())
+        self.assertIn("3 of 6 usage events priced", self.page.get_by_role("region", name="What can we actually conclude?").inner_text())
+
+        usage.click()
+        self.assertEqual(cost.get_attribute("aria-pressed"), "false")
+        self.assertEqual(usage.get_attribute("aria-pressed"), "true")
+        for index, count in enumerate((2, 3, 1), start=1):
+            row = plot.get_by_role("button", name=re.compile(f"Inspect Run {index}"))
+            self.assertIn(f"{count} recorded usage event", row.get_attribute("aria-label"))
+            self.assertIn(str(count), row.inner_text())
+        plot.get_by_role("button", name=re.compile("Inspect Run 2")).click()
+        dialog = self.page.get_by_role("dialog")
+        self.assertIn("0.035 USD", dialog.inner_text())
+        dialog.get_by_role("button", name="Close").click()
+
+        self.page.get_by_label("Sample application").select_option("document-indexer")
+        plot = self.page.get_by_role("region", name="What did each run record?")
+        self.assertEqual(plot.get_by_role("button", name="Recorded cost", exact=True).get_attribute("aria-pressed"), "true")
+        self.assertEqual(plot.locator(".demo-plot-row").count(), 2)
+        self.assertIn("0.011 USD", plot.get_by_role("button", name=re.compile("Inspect Run 1")).inner_text())
+        self.assertIn("Unpriced", plot.get_by_role("button", name=re.compile("Inspect Run 2")).inner_text())
+        coverage = self.page.get_by_role("region", name="What can we actually conclude?").inner_text()
+        self.assertIn("1 of 2 workflows", coverage)
+        self.assertIn("1 of 4 usage events priced", coverage)
+        self.assertEqual(self.requests, [], "Visual exploration of the sample should remain local and read-only")
+
+    def test_demo_plot_controls_work_on_a_phone_and_with_keyboard(self):
+        self.page.set_viewport_size({"width": 390, "height": 844})
+        self.page.goto(self.base_url + "/#demo")
+        plot = self.page.get_by_role("region", name="What did each run record?")
+        usage = plot.get_by_role("button", name="Usage events", exact=True)
+        usage.focus()
+        self.page.keyboard.press("Enter")
+        self.assertEqual(usage.get_attribute("aria-pressed"), "true")
+        run = plot.get_by_role("button", name=re.compile("Inspect Run 1"))
+        run.focus()
+        self.page.keyboard.press("Enter")
+        self.page.get_by_role("dialog", name="Workflow details").wait_for()
+        self.page.get_by_role("dialog").get_by_role("button", name="Close").click()
+        self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"),
+                             self.page.evaluate("document.documentElement.clientWidth") + 1)
+        self.assertEqual(self.requests, [])
+
     def test_website_demo_link_opens_the_public_sample(self):
         self.page.goto(self.website_url)
-        self.page.get_by_role("link", name=re.compile("Explore the sample dashboard", re.I)).click()
+        self.page.get_by_role("link", name=re.compile("Explore the interactive demo", re.I)).click()
         self.page.get_by_text(re.compile("synthetic", re.I)).first.wait_for()
         self.assertTrue(self.page.url.startswith(self.base_url + "/#demo"))
         self.assertEqual(self.requests, [])
+
+    def test_website_preview_switches_applications_and_selected_workflow(self):
+        self.page.goto(self.website_url)
+        preview = self.page.locator(".preview-window")
+        switch = preview.get_by_role("group", name="Sample application")
+        assistant = switch.get_by_role("button", name="Assistant service")
+        indexer = switch.get_by_role("button", name="Document indexer")
+        self.assertEqual(assistant.get_attribute("aria-pressed"), "true")
+        self.assertIn("$0.049", preview.locator(".preview-summary").inner_text())
+        self.assertIn("Unknown-cost events\n3", preview.locator(".preview-summary").inner_text())
+        self.assertEqual(preview.locator(".preview-bar-row").count(), 3)
+        preview.get_by_role("button", name=re.compile("Answer request 02")).click()
+        self.assertIn("Answer request 02 · Not accepted", preview.locator(".preview-detail").inner_text())
+        self.assertEqual(preview.get_by_role("button", name=re.compile("Answer request 02")).get_attribute("aria-pressed"), "true")
+        preview.get_by_role("button", name=re.compile("Answer request 03")).click()
+        self.assertIn("cost unknown", preview.get_by_role("button", name=re.compile("Answer request 03")).get_attribute("aria-label"))
+        self.assertIn("No outcome recorded", preview.locator(".preview-detail").inner_text())
+
+        indexer.click()
+        self.assertEqual(indexer.get_attribute("aria-pressed"), "true")
+        self.assertIn("$0.011", preview.locator(".preview-summary").inner_text())
+        self.assertIn("Unknown-cost events\n3", preview.locator(".preview-summary").inner_text())
+        self.assertEqual(preview.locator(".preview-bar-row").count(), 2)
+        self.assertIn("Index document 01 · Accepted", preview.locator(".preview-detail").inner_text())
+        preview.get_by_role("button", name=re.compile("Index document 02")).click()
+        self.assertIn("Two usage events have no recorded price", preview.locator(".preview-detail").inner_text())
+        self.assertIn("Partial total", preview.inner_text())
+        self.assertIn("No connected account data", preview.inner_text())
+        self.assertEqual(self.requests, [], "Interactive marketing preview must not request account data")
+
+    def test_website_mobile_menu_opens_and_closes(self):
+        self.page.set_viewport_size({"width": 390, "height": 844})
+        self.page.goto(self.website_url)
+        toggle = self.page.get_by_role("button", name="Open menu")
+        toggle.click()
+        self.assertEqual(self.page.get_by_role("button", name="Close menu").get_attribute("aria-expanded"), "true")
+        self.page.get_by_role("navigation", name="Main navigation").get_by_role("link", name="How it works").click()
+        self.assertTrue(self.page.url.endswith("#how-it-works"))
+        self.assertEqual(self.page.get_by_role("button", name="Open menu").get_attribute("aria-expanded"), "false")
+        self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"),
+                             self.page.evaluate("document.documentElement.clientWidth") + 1)
+        self.assertEqual(self.requests, [])
+
+    def test_public_demo_and_website_fit_a_phone_viewport(self):
+        for width in (320, 390):
+            self.page.set_viewport_size({"width": width, "height": 844})
+            for address, expected_heading in (
+                (self.base_url + "/#demo", "Explore a sample assessment"),
+                (self.website_url, "See the recorded work behind"),
+            ):
+                with self.subTest(address=address, width=width):
+                    self.page.goto(address)
+                    self.page.get_by_role("heading", name=re.compile(expected_heading, re.I)).wait_for()
+                    dimensions = self.page.evaluate("""() => ({
+                        viewport: document.documentElement.clientWidth,
+                        content: document.documentElement.scrollWidth,
+                    })""")
+                    self.assertLessEqual(dimensions["content"], dimensions["viewport"] + 1,
+                                         "The page should fit the viewport; wide tables may scroll inside their own container")
+        self.assertEqual(self.requests, [], "Public sample pages should not call the account API")
+
+    def test_website_has_motion_without_reduced_motion_preference(self):
+        self.page.emulate_media(reduced_motion="no-preference")
+        self.page.goto(self.website_url)
+        hero = self.page.locator(".landing-hero-copy")
+        hero.wait_for()
+        self.assertGreater(float(hero.evaluate("element => getComputedStyle(element).animationDuration").split(",")[0].removesuffix("s")), 0)
+        self.assertEqual(self.requests, [])
+
+    def test_reduced_motion_preference_disables_decorative_motion(self):
+        self.page.emulate_media(reduced_motion="reduce")
+        for address in (self.base_url + "/#demo", self.website_url):
+            with self.subTest(address=address):
+                self.page.goto(address)
+                self.page.locator("main").wait_for()
+                motion = self.page.evaluate("""() => [...document.querySelectorAll('main, main *')]
+                    .map(element => ({
+                        animation: getComputedStyle(element).animationDuration,
+                        transition: getComputedStyle(element).transitionDuration,
+                    }))
+                    .filter(item => item.animation.split(',').some(duration => parseFloat(duration) > 0)
+                        || item.transition.split(',').some(duration => parseFloat(duration) > 0))""")
+                self.assertEqual(motion, [], "Reduced motion should disable decorative animation and transition")
 
 
 if __name__ == "__main__":
