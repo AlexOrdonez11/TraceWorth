@@ -1,5 +1,29 @@
 # Local MVP agent workflow
 
+## LangChain compatibility follow-up — September 27, 2026
+
+The owner clarified that MyHandyAI calls OpenAI through LangChain. A local
+`langchain-openai` 1.6.6 / OpenAI Python 3.19.2 `ChatOpenAI.invoke` test returned
+model and token usage to LangChain, but TraceWorth emitted only a child operation
+span: its adapter inspected the raw response before LangChain parsed it. This
+follow-up is limited to supported non-streaming LangChain OpenAI calls. The
+developer owns the OpenAI integration module, the independent tester owns
+package-backed sync/async acceptance tests, the usability reviewer owns the
+onboarding review, and the coordinator owns documentation and final integration.
+Acceptance requires no change to the LangChain result or provider exception,
+one usage event with the returned model and token counts when present, no
+prompt/output/key capture, no duplicate event on repeated parsing, and the
+existing direct OpenAI regressions to remain green. Streaming and other
+LangChain providers remain outside scope. Status: accepted locally. The
+independent tester installed `.[test]` and ran 139 tests with no failures; 33
+PostgreSQL tests skipped without a test DSN. The same 19 Lambda/OpenAI tests
+passed in an isolated OpenAI Python 2.54.0 + `langchain-openai` 1.6.6
+environment. OpenAI Python 3.19.2 + `langchain-openai` 1.6.6 sync/async
+`ChatOpenAI` calls, deferred raw parsing, import-time client construction,
+provider failures, privacy, and step attribution were verified with mocked
+provider HTTP and local ingestion. The usability reviewer retested sync/async
+journeys and onboarding wording. No live provider or AWS ingestion was tested.
+
 ## Python Lambda integration milestone — September 27, 2026
 
 Scope: reduce the code edits needed for a MyHandyAI staging pilot while keeping

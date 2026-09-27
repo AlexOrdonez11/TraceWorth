@@ -6,7 +6,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from importlib.metadata import version
 import json
 import os
+from pathlib import Path
+import subprocess
 import sys
+from tempfile import TemporaryDirectory
 from threading import Thread
 import time
 from types import ModuleType
@@ -14,6 +17,7 @@ import unittest
 from unittest.mock import patch
 
 from openai import AsyncOpenAI, AuthenticationError, OpenAI
+from langchain_openai import ChatOpenAI
 
 if version("openai").split(".", 1)[0] == "2":
     import httpx as provider_http
@@ -409,6 +413,323 @@ class LambdaIntegrationTests(unittest.TestCase):
         self.assertTrue(all(event["status"] == "failed" for event in failures))
         self.assertEqual(sum(event["event_type"] == "usage.recorded" for event in events), 0)
         self.assertNotIn("private-provider-error-539", json.dumps(events))
+
+    def test_langchain_chat_invoke_captures_response_model_and_usage(self):
+        provider_requests = []
+
+        def provider(request):
+            provider_requests.append(request)
+            return provider_http.Response(200, json={
+                "id": "chatcmpl_langchain", "object": "chat.completion", "created": 1,
+                "model": "gpt-langchain-response", "choices": [{"index": 0,
+                "message": {"role": "assistant", "content": "private-langchain-output-871"},
+                "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 17, "completion_tokens": 6, "total_tokens": 23}})
+
+        http_client = provider_http.Client(transport=provider_http.MockTransport(provider))
+        async_http_client = provider_http.AsyncClient(
+            transport=provider_http.MockTransport(provider))
+        llm = ChatOpenAI(model="gpt-input-alias", api_key="private-provider-key-543",
+                         base_url="https://provider.invalid/v1", http_client=http_client,
+                         http_async_client=async_http_client, max_retries=0,
+                         use_responses_api=False)
+
+        def original(event, context):
+            return llm.invoke("private-langchain-prompt-309")
+
+        try:
+            with self.target(original), ingestion_receiver() as (endpoint, requests), self.config(
+                    endpoint, TRACEWORTH_CAPTURE_OPENAI="true"):
+                result = handler({}, FakeContext())
+        finally:
+            http_client.close()
+            asyncio.run(async_http_client.aclose())
+
+        self.assertEqual(result.content, "private-langchain-output-871")
+        self.assertEqual(result.response_metadata["model_name"], "gpt-langchain-response")
+        self.assertEqual(result.usage_metadata["input_tokens"], 17)
+        self.assertEqual(len(provider_requests), 1)
+        events = [item["body"]["events"][0] for item in requests]
+        self.assertEqual(len(events), 5)
+        usage = [event for event in events if event["event_type"] == "usage.recorded"]
+        self.assertEqual(len(usage), 1)
+        self.assertEqual(usage[0]["model_or_service"], "gpt-langchain-response")
+        self.assertEqual(usage[0]["usage_units"],
+                         {"input_tokens": 17, "output_tokens": 6})
+        child = next(event for event in events if event["event_type"] == "step.started"
+                     and event["kind"] == "operation")
+        self.assertEqual(usage[0]["step_id"], child["step_id"])
+        self.assertEqual(usage[0]["workflow_id"], child["workflow_id"])
+        serialized = json.dumps(events)
+        for private_value in ("private-provider-key-543", "private-langchain-prompt-309",
+                              "private-langchain-output-871"):
+            self.assertNotIn(private_value, serialized)
+
+    def test_langchain_chat_ainvoke_captures_response_model_and_usage(self):
+        async def provider(request):
+            return provider_http.Response(200, json={
+                "id": "chatcmpl_langchain_async", "object": "chat.completion", "created": 1,
+                "model": "gpt-langchain-async", "choices": [{"index": 0,
+                "message": {"role": "assistant", "content": "private-async-output-722"},
+                "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 9, "completion_tokens": 4, "total_tokens": 13}})
+
+        async def run():
+            http_client = provider_http.Client(
+                transport=provider_http.MockTransport(
+                    lambda request: provider_http.Response(500)))
+            async_http_client = provider_http.AsyncClient(
+                transport=provider_http.MockTransport(provider))
+            try:
+                llm = ChatOpenAI(model="gpt-input-alias", api_key="private-provider-key-642",
+                                 base_url="https://provider.invalid/v1", http_client=http_client,
+                                 http_async_client=async_http_client, max_retries=0,
+                                 use_responses_api=False)
+                return await llm.ainvoke("private-async-prompt-842")
+            finally:
+                http_client.close()
+                await async_http_client.aclose()
+
+        def original(event, context):
+            return asyncio.run(run())
+
+        with self.target(original), ingestion_receiver() as (endpoint, requests), self.config(
+                endpoint, TRACEWORTH_CAPTURE_OPENAI="true"):
+            result = handler({}, FakeContext())
+
+        self.assertEqual(result.content, "private-async-output-722")
+        self.assertEqual(result.response_metadata["model_name"], "gpt-langchain-async")
+        self.assertEqual(result.usage_metadata["input_tokens"], 9)
+        events = [item["body"]["events"][0] for item in requests]
+        self.assertEqual(len(events), 5)
+        usage = [event for event in events if event["event_type"] == "usage.recorded"]
+        self.assertEqual(len(usage), 1)
+        self.assertEqual(usage[0]["model_or_service"], "gpt-langchain-async")
+        self.assertEqual(usage[0]["usage_units"], {"input_tokens": 9, "output_tokens": 4})
+        child = next(event for event in events if event["event_type"] == "step.started"
+                     and event["kind"] == "operation")
+        self.assertEqual(usage[0]["step_id"], child["step_id"])
+        self.assertEqual(usage[0]["workflow_id"], child["workflow_id"])
+        serialized = json.dumps(events)
+        self.assertNotIn("private-async-prompt-842", serialized)
+        self.assertNotIn("private-async-output-722", serialized)
+        self.assertNotIn("private-provider-key-642", serialized)
+
+    def test_openai_raw_response_parse_captures_usage_once_without_eager_parse(self):
+        def provider(request):
+            return provider_http.Response(200, json={
+                "id": "chatcmpl_raw", "object": "chat.completion", "created": 1,
+                "model": "gpt-raw-response", "choices": [{"index": 0,
+                "message": {"role": "assistant", "content": "private-raw-output-412"},
+                "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 3, "completion_tokens": 2, "total_tokens": 5}})
+
+        client = OpenAI(api_key="private-provider-key-821", base_url="https://provider.invalid/v1",
+                        http_client=provider_http.Client(
+                            transport=provider_http.MockTransport(provider)), max_retries=0)
+
+        def original(event, context):
+            raw = client.chat.completions.with_raw_response.create(
+                model="gpt-input-alias", messages=[{"role": "user", "content": "private-raw-773"}])
+            first = raw.parse()
+            again = raw.parse()
+            self.assertIs(first, again)
+            return first.choices[0].message.content
+
+        try:
+            with self.target(original), ingestion_receiver() as (endpoint, requests), self.config(
+                    endpoint, TRACEWORTH_CAPTURE_OPENAI="true"):
+                self.assertEqual(handler({}, FakeContext()), "private-raw-output-412")
+        finally:
+            client.close()
+
+        events = [item["body"]["events"][0] for item in requests]
+        self.assertEqual(len(events), 5)
+        usage = [event for event in events if event["event_type"] == "usage.recorded"]
+        self.assertEqual(len(usage), 1)
+        self.assertEqual(usage[0]["model_or_service"], "gpt-raw-response")
+        self.assertEqual(usage[0]["usage_units"], {"input_tokens": 3, "output_tokens": 2})
+        child = next(event for event in events if event["event_type"] == "step.started"
+                     and event["kind"] == "operation")
+        self.assertEqual(usage[0]["step_id"], child["step_id"])
+        self.assertEqual(usage[0]["workflow_id"], child["workflow_id"])
+        self.assertNotIn("private-raw-773", json.dumps(events))
+        self.assertNotIn("private-raw-output-412", json.dumps(events))
+        self.assertNotIn("private-provider-key-821", json.dumps(events))
+
+    def test_openai_async_raw_response_repeated_parse_captures_once(self):
+        async def provider(request):
+            return provider_http.Response(200, json={
+                "id": "chatcmpl_raw_async", "object": "chat.completion", "created": 1,
+                "model": "gpt-raw-async", "choices": [{"index": 0,
+                "message": {"role": "assistant", "content": "private-raw-async-output-630"},
+                "finish_reason": "stop"}],
+                "usage": {"prompt_tokens": 12, "completion_tokens": 3, "total_tokens": 15}})
+
+        async def run():
+            async with AsyncOpenAI(
+                    api_key="test-provider-key", base_url="https://provider.invalid/v1",
+                    http_client=provider_http.AsyncClient(
+                        transport=provider_http.MockTransport(provider)),
+                    max_retries=0) as client:
+                raw = await client.chat.completions.with_raw_response.create(
+                    model="gpt-input-alias",
+                    messages=[{"role": "user", "content": "private-raw-async-prompt-517"}])
+                first = raw.parse()
+                second = raw.parse()
+                self.assertIs(first, second)
+                return first.choices[0].message.content
+
+        def original(event, context):
+            return asyncio.run(run())
+
+        with self.target(original), ingestion_receiver() as (endpoint, requests), self.config(
+                endpoint, TRACEWORTH_CAPTURE_OPENAI="true"):
+            self.assertEqual(handler({}, FakeContext()), "private-raw-async-output-630")
+
+        events = [item["body"]["events"][0] for item in requests]
+        self.assertEqual(len(events), 5)
+        usage = [event for event in events if event["event_type"] == "usage.recorded"]
+        self.assertEqual(len(usage), 1)
+        self.assertEqual(usage[0]["model_or_service"], "gpt-raw-async")
+        self.assertEqual(usage[0]["usage_units"], {"input_tokens": 12, "output_tokens": 3})
+        child = next(event for event in events if event["event_type"] == "step.started"
+                     and event["kind"] == "operation")
+        self.assertEqual(usage[0]["step_id"], child["step_id"])
+        self.assertNotIn("private-raw-async-prompt-517", json.dumps(events))
+        self.assertNotIn("private-raw-async-output-630", json.dumps(events))
+
+    def test_langchain_provider_failure_preserves_exception_and_hides_message(self):
+        def provider(request):
+            return provider_http.Response(401, json={
+                "error": {"message": "private-langchain-provider-error-611",
+                          "type": "invalid_api_key"}})
+
+        http_client = provider_http.Client(transport=provider_http.MockTransport(provider))
+        async_http_client = provider_http.AsyncClient(
+            transport=provider_http.MockTransport(provider))
+        llm = ChatOpenAI(model="gpt-input-alias", api_key="test-provider-key",
+                         base_url="https://provider.invalid/v1", http_client=http_client,
+                         http_async_client=async_http_client, max_retries=0,
+                         use_responses_api=False)
+
+        try:
+            with self.assertRaises(AuthenticationError) as baseline:
+                llm.invoke("private-langchain-prompt-512")
+
+            # A fresh client models first use after Lambda installs the adapter.
+            from traceworth.integrations.openai_sdk import install
+            self.assertTrue(install())
+            fresh_http_client = provider_http.Client(
+                transport=provider_http.MockTransport(provider))
+            fresh_async_http_client = provider_http.AsyncClient(
+                transport=provider_http.MockTransport(provider))
+            fresh_llm = ChatOpenAI(
+                model="gpt-input-alias", api_key="test-provider-key",
+                base_url="https://provider.invalid/v1", http_client=fresh_http_client,
+                http_async_client=fresh_async_http_client, max_retries=0,
+                use_responses_api=False)
+
+            def original(event, context):
+                return fresh_llm.invoke("private-langchain-prompt-512")
+
+            with self.target(original), ingestion_receiver() as (endpoint, requests), self.config(
+                    endpoint, TRACEWORTH_CAPTURE_OPENAI="true"):
+                with self.assertRaises(AuthenticationError) as instrumented:
+                    handler({}, FakeContext())
+        finally:
+            http_client.close()
+            asyncio.run(async_http_client.aclose())
+            if "fresh_http_client" in locals():
+                fresh_http_client.close()
+                asyncio.run(fresh_async_http_client.aclose())
+
+        self.assertEqual(str(instrumented.exception), str(baseline.exception))
+        events = [item["body"]["events"][0] for item in requests]
+        self.assertEqual(len(events), 4)
+        self.assertEqual(sum(event["event_type"] == "usage.recorded" for event in events), 0)
+        self.assertEqual({event["status"] for event in events
+                          if event["event_type"] == "step.finished"}, {"failed"})
+        self.assertNotIn("private-langchain-provider-error-611", json.dumps(events))
+        self.assertNotIn("private-langchain-prompt-512", json.dumps(events))
+
+    def test_cold_lambda_import_installs_hook_before_module_level_langchain_client(self):
+        # A client created while importing the business module caches OpenAI's
+        # with_raw_response wrapper. Verify the first invocation in a fresh
+        # process instruments that cached method, including its failure path.
+        source = '''
+from importlib.metadata import version
+from langchain_openai import ChatOpenAI
+if version("openai").split(".", 1)[0] == "2":
+    import httpx as provider_http
+else:
+    import httpx2 as provider_http
+
+def provider(request):
+    if b"cause-error" in request.content:
+        return provider_http.Response(401, json={
+            "error": {"message": "private-cold-error-905", "type": "invalid_api_key"}})
+    return provider_http.Response(200, json={
+        "id": "chatcmpl_cold", "object": "chat.completion", "created": 1,
+        "model": "gpt-cold-response", "choices": [{"index": 0,
+        "message": {"role": "assistant", "content": "private-cold-output-200"},
+        "finish_reason": "stop"}],
+        "usage": {"prompt_tokens": 7, "completion_tokens": 2, "total_tokens": 9}})
+
+http_client = provider_http.Client(transport=provider_http.MockTransport(provider))
+async_http_client = provider_http.AsyncClient(transport=provider_http.MockTransport(provider))
+llm = ChatOpenAI(model="gpt-input-alias", api_key="test-provider-key",
+                 base_url="https://provider.invalid/v1", http_client=http_client,
+                 http_async_client=async_http_client, max_retries=0,
+                 use_responses_api=False)
+
+def handle(event, context):
+    prompt = "cause-error" if event["fail"] else "private-cold-prompt-419"
+    return llm.invoke(prompt).content
+'''
+        script = '''
+from openai import AuthenticationError
+from traceworth.integrations.aws_lambda import handler
+try:
+    handler({"fail": True}, None)
+except AuthenticationError as error:
+    assert "private-cold-error-905" in str(error)
+else:
+    raise AssertionError("original provider exception was suppressed")
+assert handler({"fail": False}, None) == "private-cold-output-200"
+'''
+        with TemporaryDirectory() as directory:
+            Path(directory, "cold_langchain_target.py").write_text(source, encoding="utf-8")
+            with ingestion_receiver() as (endpoint, requests):
+                env = os.environ.copy()
+                env.update({"PYTHONPATH": directory + os.pathsep + env.get("PYTHONPATH", ""),
+                            "TRACEWORTH_ORIGINAL_HANDLER": "cold_langchain_target.handle",
+                            "TRACEWORTH_APPLICATION": "test-app",
+                            "TRACEWORTH_ENDPOINT": endpoint,
+                            "TRACEWORTH_API_KEY": "test-ingestion-key",
+                            "TRACEWORTH_CAPTURE_OPENAI": "true"})
+                result = subprocess.run([sys.executable, "-c", script], env=env,
+                                        capture_output=True, text=True, timeout=30)
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        events = [item["body"]["events"][0] for item in requests]
+        self.assertEqual(len(events), 9)
+        root_starts = [event for event in events if event["event_type"] == "step.started"
+                       and event["kind"] == "workflow"]
+        self.assertEqual(len(root_starts), 2)
+        failed_workflow = root_starts[0]["workflow_id"]
+        failure_finishes = [event for event in events if event["event_type"] == "step.finished"
+                            and event["workflow_id"] == failed_workflow]
+        self.assertEqual(len(failure_finishes), 2)
+        self.assertTrue(all(event["status"] == "failed" for event in failure_finishes))
+        usage = [event for event in events if event["event_type"] == "usage.recorded"]
+        self.assertEqual(len(usage), 1)
+        self.assertEqual(usage[0]["model_or_service"], "gpt-cold-response")
+        self.assertEqual(usage[0]["usage_units"], {"input_tokens": 7, "output_tokens": 2})
+        serialized = json.dumps(events)
+        for private_value in ("private-cold-error-905", "private-cold-output-200",
+                              "private-cold-prompt-419"):
+            self.assertNotIn(private_value, serialized)
 
 
 if __name__ == "__main__":

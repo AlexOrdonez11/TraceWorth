@@ -194,7 +194,8 @@ retention periods are enforced.
    endpoint, application, `staging` environment, release configuration and
    ingestion key. Its bounded per-invocation drain captures root duration and
    status. Opt-in OpenAI capture can record the returned model and token usage
-   for supported direct SDK calls. Additional retrieval/tool spans, retries,
+   for supported SDK calls, including the tested LangChain `ChatOpenAI` path.
+   Additional retrieval/tool spans, retries,
    and business outcomes still require explicit integration. For async or
    background work beyond the handler's lifetime, define lifecycle and
    cross-job correlation separately.

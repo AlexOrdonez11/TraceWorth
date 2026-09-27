@@ -83,16 +83,30 @@ def _close(client: TraceWorth, context: Any, timeout: float) -> None:
         _LOG.warning("TraceWorth Lambda telemetry could not finish")
 
 
-def _openai_capture(client: TraceWorth) -> Any | None:
+def _preinstall_openai() -> bool:
+    """Patch optional SDK methods before importing the application's module.
+
+    Some clients cache bound raw-response methods during construction, so
+    patching after importing their module can miss those calls.
+    """
     setting = os.environ.get("TRACEWORTH_CAPTURE_OPENAI", "").strip().lower()
     if setting not in ("1", "true", "yes", "on"):
         if setting and setting not in ("0", "false", "no", "off"):
             _LOG.warning("TraceWorth OpenAI capture disabled: invalid setting")
+        return False
+    try:
+        from .openai_sdk import install
+        return install()
+    except Exception:
+        _LOG.warning("TraceWorth OpenAI capture could not start")
+        return False
+
+
+def _openai_capture(client: TraceWorth, installed: bool) -> Any | None:
+    if not installed:
         return None
     try:
-        from .openai_sdk import capture, install
-        if not install():
-            return None
+        from .openai_sdk import capture
         scope = capture(client)
         scope.__enter__()
         return scope
@@ -107,6 +121,7 @@ def handler(event: Any, context: Any) -> Any:
     Telemetry setup, span, and delivery failures do not change the original
     handler's result or exception. Export is best effort and is not durable.
     """
+    openai_installed = _preinstall_openai()
     original, reference = _original_handler()
     configured = _telemetry_client()
     if configured is None:
@@ -121,7 +136,7 @@ def handler(event: Any, context: Any) -> Any:
         _close(client, context, timeout)
         return original(event, context)
 
-    openai_scope = _openai_capture(client)
+    openai_scope = _openai_capture(client, openai_installed)
     try:
         return original(event, context)
     finally:

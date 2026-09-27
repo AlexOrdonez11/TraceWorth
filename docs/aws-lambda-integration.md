@@ -54,7 +54,7 @@ handler setting is `my_app.handlers.answer`, change only the handler setting to
 | `TRACEWORTH_ENVIRONMENT` | `staging` | Optional; defaults to `production` |
 | `TRACEWORTH_CONFIGURATION_ID` | `release-1` | Optional stable release/configuration label |
 | `TRACEWORTH_EXPORT_TIMEOUT` | `1.0` | Optional maximum seconds to wait for delivery after the handler; defaults to 1.0 |
-| `TRACEWORTH_CAPTURE_OPENAI` | `true` | Optional; capture supported direct OpenAI Python SDK calls made inside the invocation |
+| `TRACEWORTH_CAPTURE_OPENAI` | `true` | Optional; capture supported OpenAI Python SDK calls made inside the invocation, including the tested LangChain path |
 
 Deploy the configuration with the same release as the packaged TraceWorth code.
 For multiple Lambda functions, repeat the handler setting and identify each
@@ -69,16 +69,23 @@ follow-up integration before broader deployment.
 
 With `TRACEWORTH_CAPTURE_OPENAI=true` and a compatible OpenAI Python SDK
 packaged with the app, direct non-streaming `responses.create` and
-`chat.completions.create`
-calls (sync and async) get child operation spans. When the returned object
+`chat.completions.create` calls (sync and async) get child operation spans.
+This also covers the tested
+`langchain-openai` 1.6.6 `ChatOpenAI.invoke` and `ainvoke` paths with OpenAI
+Python 3.19.2: LangChain asks the SDK for a raw response, then parses it;
+TraceWorth observes the parse without doing it early. When the parsed result
 includes both a model and token usage, TraceWorth records the model name and
 provider-reported input/output token counts. That lets MyHandyAI use the adapter
 without adding a tracing call beside every OpenAI call. It does not inspect
 request arguments or response content. Streaming calls, other OpenAI APIs,
 custom HTTP calls, and SDK wrappers that bypass these methods are outside this
-adapter. If the response has no usage, no model-only usage record is emitted;
-the report remains partial. Costs are unknown until a separate, explicit
-pricing source is supplied.
+adapter. Other LangChain versions, methods, chains, agents, and provider swaps
+have not been verified. If the response has no usage, no model-only usage
+record is emitted; the report remains partial. Costs are unknown until a
+separate, explicit pricing source is supplied. Keep the TraceWorth wrapper as
+the configured Lambda entrypoint so it can install OpenAI hooks before loading
+the application module; clients built earlier in the process may have cached
+unwrapped SDK methods.
 
 The adapter is tested against OpenAI Python 2.54.0 and 3.19.2. It accepts those
 minor-version lines (`2.54.x` and `3.19.x`) and disables itself with a sanitized

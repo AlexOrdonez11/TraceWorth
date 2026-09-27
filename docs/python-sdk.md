@@ -2,7 +2,8 @@
 
 This guide documents the Python SDK. Provider usage capture is normally manual;
 the opt-in [AWS Lambda wrapper](aws-lambda-integration.md) can capture the model
-and reported tokens from supported direct OpenAI Python SDK calls. HTTP ingestion
+and reported tokens from supported OpenAI Python SDK calls, including the tested
+LangChain `ChatOpenAI` path. HTTP ingestion
 is available through `HttpExporter`. Local assessments are available through the
 [CLI](local-mvp.md).
 
