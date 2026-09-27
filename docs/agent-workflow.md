@@ -1,5 +1,31 @@
 # Local MVP agent workflow
 
+## Read-only dashboard demo milestone — September 27, 2026
+
+The owner wants to evaluate TraceWorth itself before connecting MyHandyAI.
+This task adds an unauthenticated, clearly synthetic dashboard example and a
+landing-page entry point. MyHandyAI code, AWS account, and Lambda configuration
+are outside this milestone. The demo must not create accounts, keys, or stored
+events, and the real workspace must still begin with the account's own data.
+
+| Task | File owner | Acceptance |
+| --- | --- | --- |
+| Dashboard demo and sample report | Developer: `apps/dashboard/src/` | `#demo` opens without sign-in, shows application/workflow examples, recorded and unknown costs, outcomes and findings, marks all content synthetic, and returns to sign-in without writes |
+| Independent acceptance | Testing agent: test files only | Browser/API checks prove entry/exit, meaningful example values, no backend mutation, and existing sign-in behavior |
+| Landing entry and integration | Coordinator: `apps/website/src/`, documentation | Website links to dashboard demo; build and tests pass; deployed dashboard demo is verified after reviewed release |
+| Usability review | Reviewer: read-only browser exploration | Check desktop/mobile demo navigation, scope labels, interpretation, workflow details, and recovery |
+
+Status: accepted locally and published to the existing staging dashboard.
+The independent browser suite passed 4/4 journeys with API requests intercepted;
+the full local suite passed 143 tests with 33 PostgreSQL cases skipped because
+no disposable PostgreSQL test server was configured. TypeScript checks and both
+React production builds passed. The usability reviewer traversed the website,
+dashboard, workflow details, sign-in exit, API-offline recovery, and mobile view
+in the actual browser; the brand-link finding was fixed and retested. The
+deployed `/#demo` was checked in Chrome after CloudFront invalidation: HTTP 200,
+both applications available, and no API requests. Cloud demo seeding into an
+account remains disabled. The preview is not MyHandyAI telemetry.
+
 ## LangChain compatibility follow-up — September 27, 2026
 
 The owner clarified that MyHandyAI calls OpenAI through LangChain. A local
