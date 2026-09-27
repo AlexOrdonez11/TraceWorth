@@ -182,19 +182,23 @@ retention periods are enforced.
    website to the deployed dashboard using its build-time configuration.
 
 7. **Register the pilot.** Create a pilot account and application slug
-   `myhandyai-stage`. Generate an ingestion-only key and store it in Secrets
-   Manager, accessible only to MyHandyAI's staging execution identity. Never put
-   the key in React, a repository, image layer, or logs. Keep production separate.
+   `myhandyai-stage`. Generate an ingestion-only key and keep it in a restricted
+   secret store. The current Lambda wrapper reads the token from an encrypted
+   Lambda environment variable; it does not yet fetch a Secrets Manager ARN.
+   Never put the key in React, a repository, image layer, Terraform state, or
+   logs. Keep production separate.
 
 8. **Integrate one staging workflow.** Pin the TraceWorth package revision in
-   MyHandyAI's deployment. Configure endpoint, application, environment=staging,
-   configuration_id=release identifier and the secret key. Construct one SDK
-   client per worker process after forking; flush/close on graceful shutdown.
-   Decorate the selected workflow, add spans around provider/retrieval/tool
-   calls, record usage from actual responses, and explicit retries/outcomes.
-   For async/background workers, define lifecycle and cross-job correlation.
-   Lambda needs a separate flush/lifecycle design; an unflushed background
-   thread cannot be assumed to run after an invocation returns.
+   MyHandyAI's deployment. Start with the configuration-based
+   [Lambda wrapper](aws-lambda-integration.md): set the original handler,
+   endpoint, application, `staging` environment, release configuration and
+   ingestion key. Its bounded per-invocation drain captures root duration and
+   status. Opt-in OpenAI capture can record the returned model and token usage
+   for supported SDK calls, including the tested LangChain `ChatOpenAI` path.
+   Additional retrieval/tool spans, retries,
+   and business outcomes still require explicit integration. For async or
+   background work beyond the handler's lifetime, define lifecycle and
+   cross-job correlation separately.
 
 9. **Run controlled cases.** Execute known successful, failed, retried and
    cancelled requests; include unknown costs and missing acceptance. Compare

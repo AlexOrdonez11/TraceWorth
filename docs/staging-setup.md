@@ -218,9 +218,10 @@ service IAM, RDS TLS and restore, quotas, alarm delivery, and Lambda egress must
 be verified on the deployed stack. A single NAT and Single-AZ database can cause
 staging outages. The private HTTP origin hops are not end-to-end TLS.
 
-The SDK is still best effort, without retries or a durable spool. Lambda needs
-an invocation-aware flush strategy before it can be used for trustworthy pilot
-measurements. No public signup, recovery, invitations or email verification is
+The SDK is still best effort, without retries or a durable spool. The
+[Lambda wrapper](aws-lambda-integration.md) now performs a bounded per-invocation
+drain, but AWS delivery and count reconciliation remain unverified. No public
+signup, recovery, invitations or email verification is
 claimed. Report windows and event limits mean assessments are not an all-time
 or complete accounting record.
 

@@ -1,5 +1,62 @@
 # Local MVP agent workflow
 
+## LangChain compatibility follow-up — September 27, 2026
+
+The owner clarified that MyHandyAI calls OpenAI through LangChain. A local
+`langchain-openai` 1.6.6 / OpenAI Python 3.19.2 `ChatOpenAI.invoke` test returned
+model and token usage to LangChain, but TraceWorth emitted only a child operation
+span: its adapter inspected the raw response before LangChain parsed it. This
+follow-up is limited to supported non-streaming LangChain OpenAI calls. The
+developer owns the OpenAI integration module, the independent tester owns
+package-backed sync/async acceptance tests, the usability reviewer owns the
+onboarding review, and the coordinator owns documentation and final integration.
+Acceptance requires no change to the LangChain result or provider exception,
+one usage event with the returned model and token counts when present, no
+prompt/output/key capture, no duplicate event on repeated parsing, and the
+existing direct OpenAI regressions to remain green. Streaming and other
+LangChain providers remain outside scope. Status: accepted locally. The
+independent tester installed `.[test]` and ran 139 tests with no failures; 33
+PostgreSQL tests skipped without a test DSN. The same 19 Lambda/OpenAI tests
+passed in an isolated OpenAI Python 2.54.0 + `langchain-openai` 1.6.6
+environment. OpenAI Python 3.19.2 + `langchain-openai` 1.6.6 sync/async
+`ChatOpenAI` calls, deferred raw parsing, import-time client construction,
+provider failures, privacy, and step attribution were verified with mocked
+provider HTTP and local ingestion. The usability reviewer retested sync/async
+journeys and onboarding wording. No live provider or AWS ingestion was tested.
+
+## Python Lambda integration milestone — September 27, 2026
+
+Scope: reduce the code edits needed for a MyHandyAI staging pilot while keeping
+the SDK generic. This is local implementation and verification, not a live AWS
+integration. A configuration-based Lambda handler wrapper must preserve the
+original handler result/exception, record one root workflow per invocation,
+avoid payload and secret capture, and perform a bounded best-effort drain.
+An opt-in OpenAI Python SDK adapter should record the returned model and usage
+from supported non-streaming calls, if it can be tested against the real SDK
+without provider API calls. Streaming, business outcomes, exact costs, and full
+method discovery are outside this milestone.
+
+| Task | File owner | Acceptance |
+| --- | --- | --- |
+| Lambda wrapper and optional OpenAI adapter | Developer: `src/traceworth/integrations/` | Existing handler behavior preserved; sanitized telemetry; opt-in model capture only from verified response fields |
+| Independent acceptance | Tester: new integration tests under `tests/` | Success/failure, repeated invocations, config faults, bounded drain, privacy, and real-package OpenAI compatibility if adapter is included |
+| Guidance and integration | Coordinator: `docs/aws-lambda-integration.md`, `docs/python-sdk.md`, this record | Reproducible setup and clear pilot/deployment gates; full local regression |
+| Onboarding review | Usability reviewer: `docs/lambda-integration-usability-review.md` | Exercise documented local path, report defects, confirm claims and recovery steps |
+
+Status: accepted locally. The independent tester installed `.[test]` and ran
+133 tests with no failures; 33 PostgreSQL integration cases skipped because no
+test DSN was configured. The new Lambda/OpenAI cases passed against real
+OpenAI Python 3.19.2 using mocked provider HTTP and a real loopback ingestion
+receiver. The same 13 integration cases passed in an isolated OpenAI Python
+2.54.0 environment. The usability reviewer exercised the local handler, failed
+handler, invalid telemetry configuration, OpenAI capture, and layer ZIP layout;
+the resolved and remaining findings are in
+[the Lambda integration review](lambda-integration-usability-review.md).
+No live OpenAI API call or AWS Lambda ingestion was claimed. The TraceWorth
+cloud staging foundation is deployed but its API/dashboard are not yet running,
+and MyHandyAI has not been connected. Live network/WAF access, account/key
+creation, and capture-volume reconciliation are the next pilot gates.
+
 ## Staging foundation milestone — September 24, 2026
 
 Scope: locally verified Docker/PostgreSQL support and reviewable Terraform for
