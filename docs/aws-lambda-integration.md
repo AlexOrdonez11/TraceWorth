@@ -60,10 +60,12 @@ Deploy the configuration with the same release as the packaged TraceWorth code.
 For multiple Lambda functions, repeat the handler setting and identify each
 original handler separately. Use one application/key per client application,
 and use a staging application/key for the pilot. Do not place the key in a
-frontend build, repository, container image, or Terraform state. Lambda
-environment variables are encrypted at rest, but AWS recommends Secrets Manager
-for API keys; a later integration can fetch a secret at runtime so the key need
-not be stored as a Lambda environment value.
+frontend build, repository, container image, or Terraform state. For this
+version, `TRACEWORTH_API_KEY` must contain the token itself, not a Secrets
+Manager ARN; the wrapper does not fetch secrets. Restrict who can read or edit
+the Lambda configuration. Lambda environment variables are encrypted at rest,
+but AWS recommends Secrets Manager for API keys. Runtime secret retrieval is a
+follow-up integration before broader deployment.
 
 With `TRACEWORTH_CAPTURE_OPENAI=true` and a compatible OpenAI Python SDK
 packaged with the app, direct non-streaming `responses.create` and

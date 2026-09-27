@@ -182,9 +182,11 @@ retention periods are enforced.
    website to the deployed dashboard using its build-time configuration.
 
 7. **Register the pilot.** Create a pilot account and application slug
-   `myhandyai-stage`. Generate an ingestion-only key and store it in Secrets
-   Manager, accessible only to MyHandyAI's staging execution identity. Never put
-   the key in React, a repository, image layer, or logs. Keep production separate.
+   `myhandyai-stage`. Generate an ingestion-only key and keep it in a restricted
+   secret store. The current Lambda wrapper reads the token from an encrypted
+   Lambda environment variable; it does not yet fetch a Secrets Manager ARN.
+   Never put the key in React, a repository, image layer, Terraform state, or
+   logs. Keep production separate.
 
 8. **Integrate one staging workflow.** Pin the TraceWorth package revision in
    MyHandyAI's deployment. Start with the configuration-based
