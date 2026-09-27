@@ -1,0 +1,20 @@
+# Lambda integration usability review
+
+Reviewed September 27, 2026. Scope is the new Python Lambda handler wrapper, its opt-in OpenAI adapter, and the setup guide. No browser interface changed in this milestone; no browser coverage is claimed here.
+
+## Journeys exercised locally
+
+I imported `traceworth.integrations.aws_lambda.handler` from the repository virtual environment, configured a temporary `sample_lambda.original` handler, and sent telemetry to a disposable loopback HTTP receiver. A successful invocation returned the original result. A failing invocation raised the original `RuntimeError`. The receiver got four start/finish events across those invocations, including `completed` and `failed` status, and none contained the input event or exception message. With an empty `TRACEWORTH_API_KEY`, the original handler still ran, no events arrived, and the warning did not include the key. This verifies local wrapper behavior only; it is not an AWS network or deployed-ingestion test.
+
+I also set `TRACEWORTH_CAPTURE_OPENAI=true` and ran a handler that calls `OpenAI().responses.create` using a local `httpx.MockTransport` with OpenAI Python 3.19.2. The handler result was unchanged. The receiver got five records: root and child start/finish events plus one `usage.recorded` with the returned model `gpt-test-model`, 12 input tokens, 7 output tokens, and no amount. Neither the prompt nor the ingestion key appeared in event JSON. This is evidence for that direct non-streaming Responses path, not for real provider traffic or all OpenAI methods. The independent testing agent owns the full regression gate.
+
+## Findings and follow-up
+
+| ID | Severity | Finding and reproduction | Expected action | Status |
+| --- | --- | --- | --- | --- |
+| LAMBDA-UX-01 | P1 | The initial guide said to add an unpublished package to Lambda without a packaging command. A new user could not complete the first step from the document alone. | Give a concrete wheel/zip or layer build and import check. | Guide now gives a PowerShell layer command. `pip install --target` completed locally, and I ran `Compress-Archive` and confirmed the ZIP includes `python/traceworth/integrations/aws_lambda.py`. Deployed import check remains an AWS gate. |
+| LAMBDA-UX-02 | P2 | The initial guide asked users to inspect “missing” counts. The wrapper exposes only pending, dropped, and export-error diagnostics; missing invocations need a separate source. | Point to CloudWatch warnings and compare Lambda invocation count with dashboard workflow count. | Guide now points to CloudWatch warnings and invocation/workflow comparison. AWS verification pending. |
+| LAMBDA-UX-03 | P1 | In current AWS staging, the API task and dashboard are not deployed, and WAF currently allows only the owner's IP. Changing a Lambda handler alone cannot send events to that hostname. | Make endpoint deployment and approved stable Lambda egress explicit prerequisites. | Documented; live pilot remains gated by AWS setup. |
+| LAMBDA-UX-04 | P1 | Early drafts did not state that OpenAI capture is version-gated. A client on an unsupported version would see root invocation records but no model usage. | State supported versions and the warning/fallback behavior; verify MyHandyAI's actual installed version before enabling. | Resolved: adapter permits 2.54.x and 3.19.x; guide names both lines, exact tested patches, and the sanitized warning for other versions. Independent tester passed 13 package-backed integration cases on OpenAI 2.54.0 and the same suite on 3.19.2. |
+
+The guide correctly limits automatic provider capture to direct, non-streaming Responses and Chat Completions create calls in supported OpenAI Python SDK versions, when response usage is available. It makes no claim to infer prices or business outcomes. The wrapper alone records the root invocation boundary; it does not discover arbitrary internal functions or retries. A live MyHandyAI staging pilot still requires deployed ingestion, accessible network egress, and reconciliation against an independent invocation count.

@@ -1,8 +1,10 @@
 # Python integration guide
 
-This guide documents the current local SDK. Provider usage capture is manual;
-automatic provider adapters and remote ingestion are planned. Local assessments
-are available through the [CLI](local-mvp.md).
+This guide documents the Python SDK. Provider usage capture is normally manual;
+the opt-in [AWS Lambda wrapper](aws-lambda-integration.md) can capture the model
+and reported tokens from supported direct OpenAI Python SDK calls. HTTP ingestion
+is available through `HttpExporter`. Local assessments are available through the
+[CLI](local-mvp.md).
 
 ## Install and verify
 
