@@ -50,6 +50,11 @@ variable "api_desired_count" {
     error_message = "Starting an API task requires a tested digest-pinned image."
   }
 }
+variable "db_access_enabled" {
+  description = "Run a private SSM-managed EC2 node for occasional PostgreSQL access from an operator computer."
+  type        = bool
+  default     = false
+}
 variable "database_instance_class" {
   type    = string
   default = "db.t4g.micro"

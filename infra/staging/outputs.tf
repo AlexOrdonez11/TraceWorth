@@ -10,3 +10,4 @@ output "bootstrap_secret_arn" { value = aws_secretsmanager_secret.bootstrap.arn 
 output "private_subnets" { value = aws_subnet.private[*].id }
 output "task_security_group" { value = aws_security_group.api.id }
 output "database_endpoint" { value = aws_db_instance.main.address }
+output "db_access_instance_id" { value = try(aws_instance.db_access[0].id, null) }

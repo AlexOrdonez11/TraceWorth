@@ -2,6 +2,7 @@ mock_provider "aws" {
   override_during = plan
   mock_data "aws_availability_zones" { defaults = { names = ["us-east-2a", "us-east-2b"] } }
   mock_data "aws_cloudfront_cache_policy" { defaults = { id = "11111111-1111-1111-1111-111111111111" } }
+  mock_data "aws_ssm_parameter" { defaults = { value = "ami-0123456789abcdef0" } }
   mock_resource "aws_cloudfront_distribution" { defaults = { domain_name = "d123example.cloudfront.net" } }
   mock_resource "aws_cloudwatch_log_group" { defaults = { arn = "arn:aws:logs:us-east-2:123456789012:log-group:traceworth-staging" } }
   mock_resource "aws_ecr_repository" { defaults = { arn = "arn:aws:ecr:us-east-2:123456789012:repository/traceworth-staging" } }
@@ -33,10 +34,18 @@ override_resource {
   values          = { id = "sg-33333333333333333" }
   override_during = plan
 }
+override_resource {
+  target          = aws_security_group.db_access[0]
+  values          = { id = "sg-44444444444444444" }
+  override_during = plan
+}
 variables {
   expected_account_id = "123456789012"
   pilot_ipv4_cidrs    = ["192.0.2.1/32"]
   alert_email         = "staging-alerts@example.test"
+  db_access_enabled   = false
+  container_image     = null
+  api_desired_count   = 0
 }
 run "safe_defaults" {
   command = plan
@@ -87,6 +96,22 @@ run "configured_image_security" {
   assert {
     condition     = jsondecode(aws_iam_role_policy.execution["api"].policy).Statement[3].Resource == [aws_secretsmanager_secret.runtime_database.arn]
     error_message = "API execution role must read only its runtime secret."
+  }
+}
+run "private_database_access" {
+  command = plan
+  variables { db_access_enabled = true }
+  assert {
+    condition     = length(aws_instance.db_access) == 1 && !aws_instance.db_access[0].associate_public_ip_address && aws_instance.db_access[0].metadata_options[0].http_tokens == "required" && aws_instance.db_access[0].root_block_device[0].encrypted
+    error_message = "The operator access instance must remain private, IMDSv2-only, and encrypted."
+  }
+  assert {
+    condition     = aws_vpc_security_group_ingress_rule.database_from_db_access[0].referenced_security_group_id == aws_security_group.db_access[0].id && aws_vpc_security_group_ingress_rule.database_from_db_access[0].cidr_ipv4 == null && aws_vpc_security_group_ingress_rule.database_from_db_access[0].from_port == 5432
+    error_message = "Operator database access must use only its private security group on port 5432."
+  }
+  assert {
+    condition     = aws_iam_role_policy_attachment.db_access_ssm[0].policy_arn == "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+    error_message = "The access instance must receive only the SSM managed-node policy."
   }
 }
 run "reject_worldwide_pilot" {
