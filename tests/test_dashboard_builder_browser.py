@@ -13,7 +13,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 from uuid import uuid4
 
-from test_mvp_acceptance import span
+from test_mvp_acceptance import outcome, span, usage
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -224,6 +224,119 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         picker.select_option(label="production · stable")
         self.assertEqual(saved_volume.locator(".builder-stat strong").inner_text(), "1")
         self.assertIn("production · stable", scope.inner_text())
+
+    def test_overview_charts_follow_application_and_cohort_with_exact_evidence(self):
+        second = self.context.request.post(
+            self.base_url + "/api/applications",
+            data={"name": "Document indexer", "slug": "document-indexer"},
+            headers={"Origin": self.base_url, "X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(second.status, 201, second.text())
+        second_id = second.json()["application"]["id"]
+
+        def ingest(application_id, slug, rows):
+            key = self.context.request.post(
+                self.base_url + f"/api/applications/{application_id}/keys",
+                data={"name": "Overview browser fixture"},
+                headers={"Origin": self.base_url, "X-CSRF-Token": self.csrf},
+            )
+            self.assertEqual(key.status, 201, key.text())
+            events = []
+            for environment, configuration, amount, accepted, status in rows:
+                workflow = f"{slug}-{environment}-{uuid4().hex}"
+                root = span(workflow=workflow, status=status)
+                records = root + [usage(root[0]["step_id"], amount, workflow=workflow)]
+                if accepted is not None:
+                    records.append(outcome(accepted, workflow=workflow))
+                for record in records:
+                    record.update(application_id=slug, environment=environment,
+                                  configuration_id=configuration)
+                events.extend(records)
+            sent = self.context.request.post(
+                self.base_url + "/api/events", data={"events": events},
+                headers={"Authorization": "Bearer " + key.json()["token"]},
+            )
+            self.assertEqual(sent.status, 200, sent.text())
+            self.assertEqual(sent.json()["accepted"], len(events))
+
+        ingest(self.application_id, "assistant-service", [
+            ("production", "stable", "0.02", True, "completed"),
+            ("stage", "candidate", "0.03", False, "failed"),
+            ("stage", "candidate", None, None, "completed"),
+        ])
+        ingest(second_id, "document-indexer", [
+            ("production", "stable", "0.07", True, "completed"),
+        ])
+
+        self.page.goto(self.base_url)
+        self.page.get_by_role("heading", name="Application overview").wait_for()
+        self.page.get_by_label("Application", exact=True).select_option(self.application_id)
+        cohort_picker = self.page.get_by_label("Environment / configuration")
+        cohort_picker.select_option(label="assistant-service · production · stable")
+        overview = self.page.get_by_role("region", name="What did each run record?")
+        summary = overview.get_by_label("Selected cohort evidence")
+        self.assertIn("1\nrecorded workflows", summary.inner_text())
+        self.assertIn("1 / 1\nwith an explicit outcome", summary.inner_text())
+        self.assertIn("1 / 1\nusage events with a price", summary.inner_text())
+        self.assertIn("0 usage events with unknown cost", summary.inner_text())
+        self.assertIn("0.02 USD", overview.get_by_role("button", name=re.compile("Inspect Run 1")).inner_text())
+        self.assertNotIn("0.03 USD", overview.inner_text())
+        self.assertIn("Recorded telemetry", self.page.locator(".source-panel").inner_text())
+        self.assertIn("Received-time report", overview.inner_text())
+
+        cohort_picker.select_option(label="assistant-service · stage · candidate")
+        overview = self.page.get_by_role("region", name="What did each run record?")
+        summary = overview.get_by_label("Selected cohort evidence")
+        self.assertIn("2\nrecorded workflows", summary.inner_text())
+        self.assertIn("1 / 2\nwith an explicit outcome", summary.inner_text())
+        self.assertIn("1 / 2\nusage events with a price", summary.inner_text())
+        self.assertIn("1 usage event with unknown cost", summary.inner_text())
+        run_rows = overview.get_by_role("button", name=re.compile("Inspect Run"))
+        self.assertEqual(run_rows.count(), 2)
+        self.assertEqual(sum("0.03 USD" in text for text in run_rows.all_inner_texts()), 1)
+        self.assertEqual(sum("No comparable price" in text for text in run_rows.all_inner_texts()), 1)
+        self.assertNotIn("0.02 USD", overview.inner_text())
+        self.assertIn("partial", overview.inner_text().lower())
+        outcomes = overview.get_by_role("group", name="Workflow chart view")
+        outcomes.get_by_role("button", name="Status").click()
+        self.assertEqual(outcomes.get_by_role("button", name="Status").get_attribute("aria-pressed"), "true")
+        status_chart = overview.get_by_role("group", name="Workflow status · Vertical bars")
+        self.assertEqual(status_chart.get_by_role("button").count(), 2)
+        overview.get_by_text("View chart data").first.click()
+        self.assertEqual(overview.get_by_role("region", name="Workflow status data table").get_by_role("row").count(), 3)
+        run_rows.filter(has_text="0.03 USD").click()
+        dialog = self.page.get_by_role("dialog", name="Workflow details")
+        self.assertIn("0.03 USD", dialog.inner_text())
+        dialog.get_by_role("button", name="Close").click()
+        overview.get_by_role("button", name="Build a dashboard", exact=False).click()
+        self.page.get_by_role("heading", name="Your dashboards").wait_for()
+        self.page.get_by_role("navigation").get_by_role("button", name="Overview").click()
+
+        self.page.get_by_label("Application", exact=True).select_option(second_id)
+        self.page.get_by_label("Environment / configuration").select_option(
+            label="document-indexer · production · stable")
+        overview = self.page.get_by_role("region", name="What did each run record?")
+        self.assertIn("0.07 USD", overview.get_by_role("button", name=re.compile("Inspect Run 1")).inner_text())
+        self.assertNotIn("0.03 USD", overview.inner_text())
+        self.assertNotIn("assistant-service", self.page.locator(".source-panel").inner_text())
+        self.page.set_viewport_size({"width": 390, "height": 844})
+        status = overview.get_by_role("group", name="Workflow chart view").get_by_role("button", name="Status")
+        status.focus()
+        self.page.keyboard.press("Enter")
+        self.assertEqual(status.get_attribute("aria-pressed"), "true")
+        run = overview.get_by_role("button", name=re.compile("Inspect Run 1"))
+        run.focus()
+        self.page.keyboard.press("Enter")
+        self.page.get_by_role("dialog", name="Workflow details").get_by_role("button", name="Close").click()
+        self.assertIn("Swipe table sideways for recorded cost and Inspect",
+                      self.page.locator(".workflow-table-hint").inner_text())
+        table_region = self.page.get_by_role(
+            "region", name="Workflows table, scroll horizontally for recorded cost and details")
+        self.assertEqual(table_region.get_attribute("tabindex"), "0")
+        table_region.focus()
+        self.assertTrue(table_region.evaluate("element => element === document.activeElement"))
+        self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"),
+                             self.page.evaluate("document.documentElement.clientWidth") + 1)
 
     def test_failed_save_preserves_layout_and_allows_retry(self):
         self.open_creator()
