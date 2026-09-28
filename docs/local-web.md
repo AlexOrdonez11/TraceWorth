@@ -56,7 +56,9 @@ Motion is optional under the browser's reduced-motion preference.
 
 The demo's **Build a view** page lets visitors add, remove, reorder, and resize
 widgets using the generated report. The layout stays in browser memory and
-resets on reload; it does not call the account API or save a dashboard.
+resets on reload; it does not call the account API or save a dashboard. Chart
+widgets can show horizontal or vertical bars, a pie, or a trend using compatible
+recorded datasets. Several charts can appear in one layout.
 
 The database path is relative to the process working directory. Reuse the same
 file to retain accounts, applications, keys, sessions, events, and dashboard
@@ -84,6 +86,16 @@ Starting with a different database creates an independent workspace.
    has no saved dashboards. Choose an environment/configuration on the
    **Dashboards** page when that application has multiple cohorts; each widget
    shows only the selected cohort. The 25-dashboard limit applies per account.
+
+In the dashboard editor, add **Chart** to choose a visualization and dataset for
+that chart. Distribution choices use recorded workflow statuses or explicit
+outcomes. Per-run choices use usage-event counts, comparable priced cost, or
+recorded duration. The time option uses recorded root-step start dates. A trend
+is not a forecast; these timestamps originate in caller telemetry and may be
+sparse or missing. Cost charts exclude unknown prices and label the selected
+currency and price basis. Charts use only the selected bounded cohort, not all
+application activity. Layouts can contain several independently configured
+charts within the eight-widget limit.
 
 Synthetic demo data is scoped to the selected application and labeled
 `synthetic-demo` / `synthetic-v1`. Each explicit seed action appends two new
@@ -148,7 +160,9 @@ required except for HTTP on loopback.
   optional `application_id` list filter. `GET/PUT/DELETE /api/dashboards/{id}`
   reads, edits, or deletes one layout. Each widget has an allowed `type` and
   `half` or `full` width. Mutations require the owner session, CSRF token, and
-  allowed origin; ingestion keys cannot access layouts.
+  allowed origin; ingestion keys cannot access layouts. Chart widgets carry a
+  unique UUID, visualization, and dataset, with compatible combinations checked
+  server-side. Existing fixed-widget layouts remain supported.
 - `POST /api/applications/{id}/demo` is an authenticated, CSRF-protected explicit
   synthetic seed. `GET /api/health` is an unauthenticated health check.
 

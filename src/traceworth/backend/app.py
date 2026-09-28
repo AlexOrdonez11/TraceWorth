@@ -10,14 +10,14 @@ import re
 import secrets
 import sqlite3
 import time
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Literal
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from typing import Annotated, Literal
 
 from ..assessment import assess_events
 from ..sdk import TraceWorth
@@ -96,10 +96,53 @@ class DashboardWidget(StrictModel):
     width: Literal['half', 'full']
 
 
+ChartDataset = Literal[
+    'workflow_status', 'workflow_outcome', 'usage_by_run',
+    'cost_by_run', 'duration_by_run', 'workflows_over_time',
+]
+ChartVisualization = Literal['horizontal_bar', 'vertical_bar', 'pie', 'trend']
+CHART_COMPATIBILITY = {
+    'workflow_status': {'horizontal_bar', 'vertical_bar', 'pie'},
+    'workflow_outcome': {'horizontal_bar', 'vertical_bar', 'pie'},
+    'usage_by_run': {'horizontal_bar', 'vertical_bar', 'trend'},
+    'cost_by_run': {'horizontal_bar', 'vertical_bar', 'trend'},
+    'duration_by_run': {'horizontal_bar', 'vertical_bar', 'trend'},
+    'workflows_over_time': {'vertical_bar', 'trend'},
+}
+
+
+class DashboardChartWidget(StrictModel):
+    type: Literal['chart']
+    id: str
+    width: Literal['half', 'full']
+    visualization: ChartVisualization
+    dataset: ChartDataset
+
+    @field_validator('id')
+    @classmethod
+    def valid_id(cls, value):
+        try:
+            canonical = str(UUID(value))
+        except (ValueError, TypeError, AttributeError) as exc:
+            raise ValueError('Chart ID must be a UUID string') from exc
+        if canonical != value.lower():
+            raise ValueError('Chart ID must be a hyphenated UUID string')
+        return canonical
+
+    @model_validator(mode='after')
+    def compatible_chart(self):
+        if self.visualization not in CHART_COMPATIBILITY[self.dataset]:
+            raise ValueError('Visualization is not supported for this dataset')
+        return self
+
+
+DashboardWidgetInput = Annotated[DashboardWidget | DashboardChartWidget, Field(discriminator='type')]
+
+
 class DashboardInput(StrictModel):
     name: str
     application_id: str = Field(min_length=1, max_length=128)
-    widgets: list[DashboardWidget] = Field(min_length=1, max_length=8)
+    widgets: list[DashboardWidgetInput] = Field(min_length=1, max_length=8)
 
     @field_validator('application_id')
     @classmethod
@@ -121,14 +164,15 @@ class DashboardInput(StrictModel):
     @field_validator('widgets')
     @classmethod
     def unique_widgets(cls, value):
-        if len({widget.type for widget in value}) != len(value):
-            raise ValueError('Each widget type may appear only once')
+        identities = [('chart', widget.id) if isinstance(widget, DashboardChartWidget) else ('legacy', widget.type) for widget in value]
+        if len(set(identities)) != len(identities):
+            raise ValueError('Each legacy widget type and chart ID may appear only once')
         return value
 
 
 class DashboardUpdate(StrictModel):
     name: str
-    widgets: list[DashboardWidget] = Field(min_length=1, max_length=8)
+    widgets: list[DashboardWidgetInput] = Field(min_length=1, max_length=8)
 
     @field_validator('name')
     @classmethod
