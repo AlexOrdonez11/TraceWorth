@@ -1,9 +1,10 @@
 # Staging preparation: Docker, PostgreSQL and Terraform
 
 The Terraform bootstrap and base staging infrastructure were applied on
-September 26, 2026. The AWS resources are present, but the API service still
-has zero running tasks and the dashboard build has not been uploaded. Secrets,
-migrations, the owner account, and MyHandyAI integration remain to be done.
+September 26, 2026. As checked on September 28, one API task is healthy behind
+CloudFront, an earlier dashboard build is in S3, and PostgreSQL migrations 1
+and 2 are present. The saved-dashboard migration 3 and the latest local React
+Overview have not been deployed. MyHandyAI integration remains to be done.
 The SDK remains independent of where the caller runs.
 
 Pausing traffic later stops request-based costs. Setting the API service count
@@ -33,6 +34,46 @@ the protected database and state bucket deliberately resist routine deletion.
 The marketing website remains a separate React application. The first cloud
 pilot deploys the dashboard; a separate website bucket/distribution can follow.
 The generated `https://…cloudfront.net` address works without buying a domain.
+
+## Inspect the private staging database from Windows
+
+The optional Terraform variable `db_access_enabled = true` creates a persistent
+Amazon Linux `t4g.micro` access instance in a private subnet. It has no public
+IP or inbound ports. Its security group can reach only PostgreSQL on the RDS
+security group and HTTPS through the existing NAT gateway; its IAM role has the
+AWS Systems Manager managed-instance policy, but no database or Secrets Manager
+credentials. Review a saved Terraform plan before enabling it. The instance and
+its encrypted 8 GB disk incur charges while provisioned, even when no tunnel is
+open. The RDS instance remains private.
+
+Install [pgAdmin 4 for Windows](https://www.pgadmin.org/download/pgadmin-4-windows/)
+and the [AWS Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/install-plugin-windows.html).
+With the `traceworth-staging` AWS profile signed in, open a PowerShell terminal
+at the repository root and keep this command running:
+
+```powershell
+./scripts/start-staging-db-tunnel.ps1
+```
+
+It reads the current EC2 ID and RDS endpoint from Terraform state and forwards
+the private PostgreSQL port to `127.0.0.1:15432`. In pgAdmin, register a server
+with these settings:
+
+| pgAdmin field | Value |
+| --- | --- |
+| Name | `TraceWorth staging (SSM tunnel)` |
+| Host name/address | RDS endpoint from `terraform -chdir=infra/staging output -raw database_endpoint` |
+| Port / Maintenance database | `15432` / `traceworth` |
+| Username | `username` from Secrets Manager secret `traceworth-staging/runtime-database` |
+| Parameters → Host address | `127.0.0.1` |
+| Parameters → SSL mode | `verify-full` |
+| Parameters → Root certificate | Local copy of the [AWS RDS CA bundle](https://docs.aws.amazon.com/AmazonRDS/latest/UserGuide/UsingWithRDS.SSL.html) |
+
+Enter the runtime secret's password when pgAdmin prompts; do not put it in the
+repository or the server definition. The hostname is used to verify RDS's TLS
+certificate, while the Host address points the TCP connection through the local
+tunnel. The runtime database role can write application tables, so use only
+intentional read-only queries when inspecting data. Close the tunnel with Ctrl+C.
 
 ## Rehearse locally first
 
