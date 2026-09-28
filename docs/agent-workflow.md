@@ -1,5 +1,35 @@
 # Local MVP agent workflow
 
+## Aggregate-first Overview — September 28, 2026
+
+The owner wants the Overview to explain the selected cohort as a whole before
+showing individual runs. This bounded milestone replaces the run-by-run primary
+plots with aggregate evidence and descriptive analysis, then moves individual
+investigation into clearly labeled top-10 rankings. The same composition must
+work for signed-in report cohorts and the API-free synthetic demo. Every value
+comes from the selected application/cohort or fictional context slice. Cost
+rankings compare one explicit currency and price basis; unknown prices are never
+zero, and missing outcomes/durations remain missing. Rankings are observed
+evidence, not verified recommendations or complete application accounting.
+
+| Task | File owner | Acceptance |
+| --- | --- | --- |
+| Aggregate Overview and top-10 investigations | Developer: `apps/dashboard/src/` | Prominent workflow/outcome/usage/cost and duration evidence; aggregate charts/analysis ahead of ranked runs; top ten comparable recorded cost, slowest recorded duration, and usage-event count when available; deterministic ties, missing-value caveats, accessible run drill-down, responsive layout; generic chart builder still supports per-run charts |
+| Independent regression | Testing agent: `tests/` | Exact aggregates and rankings from selected cohort, filter isolation, currencies/bases/unknowns, empty/small samples, keyboard/mobile drill-down, builder preservation, zero demo API calls, signed-in cohort behavior |
+| Usability review | Reviewer: read-only actual browser | Inspect hierarchy, terminology, aggregate interpretation, ranking caveats, phone and keyboard behavior, demo context filters, run details, and builder path; report exact repro and priorities |
+
+Status: accepted locally. The developer delivered five aggregate evidence
+cards, count-backed observations, and three top-10 investigations with exact
+decimal cost comparisons within each currency and price basis. Independent
+acceptance passed 17/17 public demo browser cases, 9/9 signed-in dashboard
+cases, and 5/5 rich fixture cases. The usability reviewer passed the public
+demo and isolated signed-in stack on desktop and phone, including mixed-cost
+groups, unknown-price recovery, keyboard drill-down, and the builder path.
+The complete Python suite passed 181 tests with 34 PostgreSQL integration
+skips because no disposable test DSN was configured; TypeScript typecheck and
+both production builds passed. The coordinator owns final integration. No new
+backend metrics or account-role model is part of this work.
+
 ## Richer synthetic demo — September 28, 2026
 
 The owner wants substantially more data and visual depth in the public demo.

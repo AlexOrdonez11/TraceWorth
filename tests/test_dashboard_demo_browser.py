@@ -15,6 +15,7 @@ from urllib.error import URLError
 from urllib.request import urlopen
 import json
 from decimal import Decimal
+import math
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -30,8 +31,21 @@ def sample_cohort(application_id):
                 if cohort["application_id"] == application_id)
 
 
-def chart_amount(amount):
-    return format(Decimal(amount).normalize(), "f")
+def ranked_ids(workflows, metric, currency="USD", basis="estimated"):
+    rows = []
+    for workflow in workflows:
+        if metric == "cost":
+            prices = [Decimal(cost["amount"]) for cost in workflow["costs"]
+                      if cost["currency"] == currency and cost["cost_basis"] == basis]
+            if not prices:
+                continue
+            value = sum(prices, Decimal(0))
+        else:
+            value = workflow["duration_ms"] if metric == "duration" else workflow["usage_events"]
+            if not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                continue
+        rows.append((workflow["workflow_id"], value))
+    return [workflow_id for workflow_id, _ in sorted(rows, key=lambda row: (-row[1], row[0]))]
 
 
 class DashboardDemoBrowserAcceptance(unittest.TestCase):
@@ -278,12 +292,28 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
         self.page.goto(self.base_url + "/#demo")
         assistant = sample_cohort("assistant-service")
         summary_data = assistant["summary"]
-        plot = self.page.get_by_role("region", name="What did each run record?")
+        plot = self.page.get_by_role("region", name="What does this cohort show?")
         summary = plot.get_by_label("Selected cohort evidence")
         self.assertIn(f"{summary_data['workflows']}\nrecorded workflows", summary.inner_text())
         self.assertIn(f"{summary_data['outcome_workflows']} / {summary_data['workflows']}\nwith an explicit outcome", summary.inner_text())
         self.assertIn(f"{summary_data['known_cost_events']} / {summary_data['usage_events']}\nusage events with a price", summary.inner_text())
         self.assertIn(f"{summary_data['unknown_cost_events']} usage events with unknown cost", summary.inner_text())
+        self.assertEqual(plot.locator(".overview-aggregate-grid .overview-chart-card").count(), 5)
+        coverage = plot.locator(".overview-chart-card").filter(has_text="Usage price coverage")
+        self.assertIn(f"{summary_data['known_cost_events']} of {summary_data['usage_events']} recorded usage events include a price", coverage.inner_text())
+        self.assertEqual(coverage.get_by_role("img").get_attribute("aria-label"),
+                         f"{summary_data['known_cost_events']} priced usage events; {summary_data['unknown_cost_events']} usage events with unknown cost")
+        self.assertIn(f"{assistant['costs'][0]['amount']} USD", plot.locator(".overview-chart-card").filter(has_text="Recorded cost by currency and basis").inner_text())
+        durations = sorted(row["duration_ms"] for row in assistant["workflows"] if row["duration_ms"] is not None)
+        expected_median = (durations[8] + durations[9]) / 2
+        duration_card = plot.locator(".overview-chart-card").filter(has_text="Recorded root duration")
+        self.assertIn(f"median of {len(durations)} recorded root durations", duration_card.inner_text())
+        self.assertEqual(expected_median, 1045)
+        self.assertIn("≈1050 ms", duration_card.inner_text())
+        self.assertEqual(plot.get_by_role("group", name="Workflows over time · Trend").get_by_role("button").count(), 18)
+        observations = plot.get_by_label("What the evidence says").inner_text()
+        self.assertIn(f"{summary_data['outcome_workflows']} of {summary_data['workflows']} workflows have an explicit outcome", observations)
+        self.assertIn(f"{summary_data['known_cost_events']} of {summary_data['usage_events']} recorded usage events have a price", observations)
         outcome = plot.get_by_role("group", name="Workflow chart view")
         self.assertEqual(outcome.get_by_role("button", name="Outcomes").get_attribute("aria-pressed"), "true")
         self.assertIn(f"Accepted: {summary_data['accepted_workflows']}",
@@ -295,49 +325,29 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
                       status_chart.get_by_role("button", name=re.compile("completed:")).get_attribute("aria-label"))
         self.assertIn(f"failed: {summary_data['failed_workflows']}",
                       status_chart.get_by_role("button", name=re.compile("failed:")).get_attribute("aria-label"))
-        outcome.get_by_role("button", name="Outcomes").click()
-        cost = plot.get_by_role("button", name="Recorded cost", exact=True)
-        usage = plot.get_by_role("button", name="Usage events", exact=True)
-        self.assertEqual(cost.get_attribute("aria-pressed"), "true")
-        self.assertEqual(usage.get_attribute("aria-pressed"), "false")
-        cost_chart = plot.get_by_role("group", name="Recorded cost by run · Horizontal bars")
-        first_run = assistant["workflows"][0]
-        self.assertIn(f"{chart_amount(first_run['costs'][0]['amount'])} USD",
-                      cost_chart.get_by_role("button", name=re.compile(r"^Inspect Run 1\b")).inner_text())
-        self.assertIn("partial", plot.inner_text().lower())
-        self.assertEqual(cost_chart.get_by_role("button").count(), summary_data["workflows"])
-        cost_chart.locator("xpath=../..").get_by_text("View chart data").click()
-        self.assertEqual(plot.get_by_role("region", name="Recorded cost by run data table").get_by_role("row").count(),
-                         summary_data["workflows"] + 1)
-        self.assertEqual(plot.get_by_role("group", name="Workflows over time · Trend").get_by_role("button").count(), 18)
-        self.assertEqual(plot.get_by_role("group", name="Duration by run · Vertical bars").get_by_role("button").count(),
-                         summary_data["workflows"])
-        self.assertEqual(plot.locator(".overview-chart-card").count(), 4)
-
-        usage.click()
-        self.assertEqual(cost.get_attribute("aria-pressed"), "false")
-        self.assertEqual(usage.get_attribute("aria-pressed"), "true")
-        usage_chart = plot.get_by_role("group", name="Usage events by run · Horizontal bars")
-        for index, workflow in enumerate(assistant["workflows"], start=1):
-            row = usage_chart.get_by_role("button", name=re.compile(rf"^Inspect Run {index}\b"))
-            self.assertIn(f": {workflow['usage_events']}", row.get_attribute("aria-label"))
-            self.assertIn(str(workflow["usage_events"]), row.inner_text())
-        usage_chart.get_by_role("button", name=re.compile(r"^Inspect Run 2\b")).click()
+        for title, metric in (("Highest comparable recorded cost", "cost"),
+                              ("Longest recorded duration", "duration"),
+                              ("Most usage events", "usage")):
+            ranking = plot.get_by_role("article", name=title)
+            expected = ranked_ids(assistant["workflows"], metric)
+            self.assertEqual(ranking.locator("ol button").count(), min(10, len(expected)))
+            self.assertEqual(ranking.locator("ol button").evaluate_all(
+                "rows => rows.map(row => row.dataset.workflowId)"), expected[:10])
+            self.assertIn(f"Top {min(10, len(expected))} of {len(expected)} eligible", ranking.inner_text())
+        cost_ranking = plot.get_by_role("article", name="Highest comparable recorded cost")
+        cost_ranking.locator("ol button").first.click()
         dialog = self.page.get_by_role("dialog")
-        selected = assistant["workflows"][1]
-        self.assertIn(selected["workflow_id"], dialog.inner_text())
+        self.assertIn(ranked_ids(assistant["workflows"], "cost")[0], dialog.inner_text())
         self.assertIn("Fictional context:", dialog.inner_text())
         dialog.get_by_role("button", name="Close").click()
 
         self.page.get_by_label("Sample application").select_option("document-indexer")
         indexer = sample_cohort("document-indexer")
         indexer_summary = indexer["summary"]
-        plot = self.page.get_by_role("region", name="What did each run record?")
-        self.assertEqual(plot.get_by_role("button", name="Recorded cost", exact=True).get_attribute("aria-pressed"), "true")
-        cost_chart = plot.get_by_role("group", name="Recorded cost by run · Horizontal bars")
-        self.assertEqual(cost_chart.get_by_role("button").count(), indexer_summary["workflows"])
-        self.assertIn(f"{chart_amount(indexer['workflows'][0]['costs'][0]['amount'])} USD",
-                      cost_chart.get_by_role("button", name=re.compile(r"^Inspect Run 1\b")).inner_text())
+        plot = self.page.get_by_role("region", name="What does this cohort show?")
+        self.assertEqual(plot.get_by_role("article", name="Highest comparable recorded cost").locator("ol button")
+                         .evaluate_all("rows => rows.map(row => row.dataset.workflowId)"),
+                         ranked_ids(indexer["workflows"], "cost")[:10])
         summary = plot.get_by_label("Selected cohort evidence").inner_text()
         self.assertIn(f"{indexer_summary['outcome_workflows']} / {indexer_summary['workflows']}\nwith an explicit outcome", summary)
         self.assertIn(f"{indexer_summary['known_cost_events']} / {indexer_summary['usage_events']}\nusage events with a price", summary)
@@ -348,32 +358,18 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
     def test_demo_plot_controls_work_on_a_phone_and_with_keyboard(self):
         self.page.set_viewport_size({"width": 390, "height": 844})
         self.page.goto(self.base_url + "/#demo")
-        plot = self.page.get_by_role("region", name="What did each run record?")
+        plot = self.page.get_by_role("region", name="What does this cohort show?")
         status = plot.get_by_role("group", name="Workflow chart view").get_by_role("button", name="Status")
         status.focus()
         self.page.keyboard.press("Enter")
         self.assertEqual(status.get_attribute("aria-pressed"), "true")
         self.assertGreaterEqual(plot.get_by_role("group", name="Workflow status · Vertical bars").get_by_role("button").count(), 2)
-        usage = plot.get_by_role("button", name="Usage events", exact=True)
-        usage.focus()
-        self.page.keyboard.press("Enter")
-        self.assertEqual(usage.get_attribute("aria-pressed"), "true")
-        run = plot.get_by_role("group", name="Usage events by run · Horizontal bars").get_by_role(
-            "button", name=re.compile(r"^Inspect Run 1\b"))
+        run = plot.get_by_role("article", name="Most usage events").locator("ol button").first
         run.focus()
         self.page.keyboard.press("Enter")
         self.page.get_by_role("dialog", name="Workflow details").wait_for()
         self.page.get_by_role("dialog").get_by_role("button", name="Close").click()
-        duration = plot.get_by_role("group", name="Duration by run · Vertical bars")
-        self.assertEqual(duration.get_attribute("tabindex"), "0")
-        self.assertEqual(duration.get_attribute("aria-describedby"), "overview-duration-scroll-hint")
-        self.assertIn("Swipe or scroll sideways to see all 18 bars",
-                      plot.locator(".chart-scroll-hint").last.inner_text())
-        self.assertGreater(duration.evaluate("element => element.scrollWidth - element.clientWidth"), 0)
-        duration.focus()
-        self.page.keyboard.press("ArrowRight")
-        self.page.wait_for_timeout(150)
-        self.assertGreater(duration.evaluate("element => element.scrollLeft"), 0)
+        self.assertEqual(plot.get_by_role("article", name="Longest recorded duration").locator("ol button").count(), 10)
         self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"),
                              self.page.evaluate("document.documentElement.clientWidth") + 1)
         self.assertEqual(self.requests, [])
@@ -385,7 +381,7 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
 
         def assert_slice(application, organization="*", group="*", user="*"):
             selected = SAMPLE["slices"]["|".join((application, organization, group, user))]
-            overview = self.page.get_by_role("region", name="What did each run record?")
+            overview = self.page.get_by_role("region", name="What does this cohort show?")
             summary = overview.get_by_label("Selected cohort evidence").inner_text()
             counts = selected["summary"]
             self.assertIn(f"{counts['workflows']}\nrecorded workflows", summary)
@@ -401,8 +397,16 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
             if selected["costs"]:
                 self.assertIn(f"{selected['costs'][0]['amount']} USD",
                               self.page.locator(".panel:has(h2:text-is('Recorded sample costs'))").inner_text())
-            self.assertEqual(overview.get_by_role("group", name="Recorded cost by run · Horizontal bars")
-                             .get_by_role("button").count(), counts["workflows"])
+            workflows = [workflow for workflow in sample_cohort(application)["workflows"]
+                         if workflow["workflow_id"] in selected["workflow_ids"]]
+            for title, metric in (("Highest comparable recorded cost", "cost"),
+                                  ("Longest recorded duration", "duration"),
+                                  ("Most usage events", "usage")):
+                self.assertEqual(overview.get_by_role("article", name=title).locator("ol button")
+                                 .evaluate_all("rows => rows.map(row => row.dataset.workflowId)"),
+                                 ranked_ids(workflows, metric)[:10])
+            self.assertIn(f"{counts['known_cost_events']} of {counts['usage_events']} recorded usage events include a price",
+                          overview.inner_text())
             return selected
 
         initial = assert_slice("assistant-service")
@@ -424,13 +428,12 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
         self.assertEqual(user_slice["summary"]["workflows"], 2)
         self.assertNotIn("failed steps", self.page.locator(".findings-section").inner_text().lower())
         self.assertNotIn("retries", self.page.locator(".findings-section").inner_text().lower())
-        overview = self.page.get_by_role("region", name="What did each run record?")
+        overview = self.page.get_by_role("region", name="What does this cohort show?")
         self.assertEqual(overview.get_by_role("group", name="Workflows over time · Vertical bars")
                          .get_by_role("button").count(), 2)
         self.assertIn("Gaps have no recorded root start", overview.inner_text())
         self.assertEqual(overview.get_by_role("group", name="Workflows over time · Trend").count(), 0)
-        self.assertEqual(overview.get_by_role("group", name="Duration by run · Vertical bars")
-                         .get_by_role("button").count(), 2)
+        self.assertIn("median of 2 recorded root durations", overview.inner_text())
         row = self.page.get_by_role("region", name="Sample workflows table, scroll horizontally for more columns")
         row.get_by_role("button", name=re.compile("Inspect answer_question")).first.click()
         dialog = self.page.get_by_role("dialog", name="Workflow details")
@@ -460,7 +463,7 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
         self.page.get_by_label("Client group").select_option("research")
         self.page.get_by_label("Sample user").select_option("iris")
         self.page.get_by_role("heading", name="No generated workflows match").wait_for()
-        self.assertEqual(self.page.get_by_role("region", name="What did each run record?").count(), 0)
+        self.assertEqual(self.page.get_by_role("region", name="What does this cohort show?").count(), 0)
         self.assertIn("no sample events", self.page.locator(".empty-panel").inner_text().lower())
         self.page.get_by_role("navigation", name="Demo navigation").get_by_role("button", name="Build a view").click()
         self.assertIn("No generated workflows match this combination. Clear context filters",
@@ -468,7 +471,7 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
         self.assertEqual(self.page.get_by_label("Dashboard preview").count(), 0)
         self.page.get_by_role("navigation", name="Demo navigation").get_by_role("button", name="Overview").click()
         self.page.get_by_role("button", name="Clear context filters").click()
-        self.page.get_by_role("region", name="What did each run record?").wait_for()
+        self.page.get_by_role("region", name="What does this cohort show?").wait_for()
         self.assertEqual(self.page.get_by_label("Fictional organization").input_value(), "")
         self.assertEqual(self.page.get_by_label("Client group").input_value(), "")
         self.assertEqual(self.page.get_by_label("Sample user").input_value(), "")
@@ -493,11 +496,13 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
         self.assertIn("There is no price evidence for usage in these generated runs.",
                       cost_panel.inner_text())
         self.assertIn("No priced usage recorded. Cost is unknown, not zero.", cost_panel.inner_text())
-        overview = self.page.get_by_role("region", name="What did each run record?")
-        self.assertEqual(overview.get_by_role("button", name="Usage events", exact=True).get_attribute("aria-pressed"), "true")
-        overview.get_by_role("button", name="Recorded cost", exact=True).click()
-        self.assertIn("No chartable values", overview.inner_text())
-        self.assertIn("Unknown cost is not zero", overview.inner_text())
+        overview = self.page.get_by_role("region", name="What does this cohort show?")
+        self.assertIn("0 of 8 recorded usage events include a price", overview.inner_text())
+        self.assertIn("No priced usage recorded. Cost is unknown, not zero.", overview.inner_text())
+        cost_ranking = overview.get_by_role("article", name="Highest comparable recorded cost")
+        self.assertEqual(cost_ranking.locator("ol button").count(), 0)
+        self.assertIn("No runs have a comparable recorded value", cost_ranking.inner_text())
+        self.assertEqual(overview.get_by_role("article", name="Most usage events").locator("ol button").count(), 4)
         table = self.page.get_by_role("region", name="Sample workflows table, scroll horizontally for more columns")
         self.assertEqual(table.locator("tbody tr").count(), selected["summary"]["workflows"])
         self.assertNotIn("0 USD", table.inner_text())
