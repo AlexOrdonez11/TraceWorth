@@ -1,5 +1,26 @@
 # Local MVP agent workflow
 
+## Demo-to-workspace API recovery — September 28, 2026
+
+Reported failure: the public demo composer works without the API, but its
+**Open workspace** link exits to sign-in. With the local FastAPI process stopped,
+Vite returns 502 for `/api/config`, and the generic error makes this look like
+a demo editor failure. The coordinator reproduced this with the API offline,
+backed up the existing local SQLite file, started the API, and verified that
+demo-to-sign-in then succeeds. The demo must remain API-free.
+
+| Task | Owner | Acceptance |
+| --- | --- | --- |
+| Explain transition and local recovery | Developer: dashboard UI | Sign-in CTA describes saving; local API-offline screen names the missing service and start command, with retry/demo recovery; cloud message remains generic |
+| Independent regression | Testing agent: `tests/` | API-offline demo composer has zero API calls; sign-in transition shows actionable recovery; API-on transition opens sign-in |
+| Usability review | Reviewer: actual browser | Recheck offline and restored journeys for clarity, including the previously reported error |
+
+Status: accepted locally. Fourteen independent demo browser cases pass,
+including an actual Vite 502 with the API port stopped, and the reviewer
+rechecked the offline and restored journeys at phone width. No telemetry or
+account data was removed; the local database backup is under ignored
+`local-data/`.
+
 ## Custom dashboard creator milestone — September 27, 2026
 
 The owner requested a more useful public demo and a tool for users to create

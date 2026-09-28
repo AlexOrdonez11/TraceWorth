@@ -54,9 +54,16 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
 
         port = cls.free_port()
         cls.base_url = f"http://127.0.0.1:{port}"
+        # Reserve a port without listening so Vite's real proxy gets ECONNREFUSED.
+        cls.unavailable_api_socket = socket.socket()
+        cls.unavailable_api_socket.bind(("127.0.0.1", 0))
+        unavailable_api_port = cls.unavailable_api_socket.getsockname()[1]
+        dashboard_environment = os.environ.copy()
+        dashboard_environment["TRACEWORTH_DEV_API_TARGET"] = f"http://127.0.0.1:{unavailable_api_port}"
         cls.server = subprocess.Popen(
             ["node", str(VITE), "--host", "127.0.0.1", "--port", str(port), "--strictPort"],
             cwd=DASHBOARD,
+            env=dashboard_environment,
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
@@ -81,6 +88,7 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
                 cls.website_server.wait(timeout=5)
             cls.server.terminate()
             cls.server.wait(timeout=5)
+            cls.unavailable_api_socket.close()
             raise
 
     @classmethod
@@ -92,6 +100,8 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
         if hasattr(cls, "server"):
             cls.server.terminate()
             cls.server.wait(timeout=5)
+        if hasattr(cls, "unavailable_api_socket"):
+            cls.unavailable_api_socket.close()
         if hasattr(cls, "website_server"):
             cls.website_server.terminate()
             cls.website_server.wait(timeout=5)
@@ -168,6 +178,68 @@ class DashboardDemoBrowserAcceptance(unittest.TestCase):
         exit_demo.click()
         self.assertNotEqual(self.page.evaluate("location.hash"), "#demo")
         self.page.get_by_text(re.compile("API unavailable|Retry connection", re.I)).first.wait_for()
+
+    def test_demo_builder_needs_no_api_and_workspace_exit_explains_offline_api(self):
+        self.page.goto(self.base_url + "/#demo")
+        self.page.get_by_role("button", name=re.compile("Build a sample view", re.I)).click()
+        self.page.get_by_role("heading", name="Shape the sample into your view").wait_for()
+        self.assertEqual(self.requests, [], "Entering the demo builder must not call the account API")
+        failed_requests = []
+        self.page.route(
+            "**/api/config",
+            lambda route: (failed_requests.append((route.request.method, route.request.url)), route.abort("failed")),
+            times=1,
+        )
+        self.page.get_by_role("button", name=re.compile("sign in.*save|save.*sign in", re.I)).click()
+        self.assertEqual(self.page.evaluate("location.hash"), "#login")
+        alert = self.page.get_by_role("alert")
+        self.assertIn("The local Python API is unavailable on port 18766.", alert.inner_text())
+        self.assertNotIn("Failed to fetch", alert.inner_text())
+        self.page.get_by_text(re.compile(r"traceworth\.backend.*18766", re.I)).first.wait_for()
+        self.page.get_by_role("button", name=re.compile("Retry connection", re.I)).wait_for()
+        self.assertEqual(failed_requests, [("GET", self.base_url + "/api/config")])
+        self.assertEqual(self.requests, [])
+        self.page.get_by_role("button", name=re.compile("Explore synthetic demo", re.I)).click()
+        self.page.get_by_role("heading", name="Explore a sample assessment").wait_for()
+        self.assertEqual(self.page.evaluate("location.hash"), "#demo")
+        self.assertFalse(any(method != "GET" for method, _ in self.requests))
+
+    def test_demo_builder_sign_in_to_save_uses_existing_login_when_api_is_online(self):
+        self.api_available = True
+        self.page.goto(self.base_url + "/#demo")
+        self.page.get_by_role("button", name=re.compile("Build a sample view", re.I)).click()
+        self.assertEqual(self.requests, [])
+        self.page.get_by_role("button", name=re.compile("sign in.*save|save.*sign in", re.I)).click()
+        self.assertEqual(self.page.evaluate("location.hash"), "#login")
+        self.page.get_by_label("Email").wait_for()
+        self.page.get_by_label("Password").wait_for()
+        self.assertFalse(any(method != "GET" for method, _ in self.requests))
+        self.page.get_by_label("Email").fill("browser@example.test")
+        self.page.get_by_label("Password").fill("example-password")
+        self.page.get_by_role("button", name=re.compile("Sign in", re.I)).last.click()
+        self.page.get_by_role("heading", name="Application overview").wait_for()
+        self.assertEqual(sum(method == "POST" and url.endswith("/api/auth/login") for method, url in self.requests), 1)
+
+    def test_real_vite_proxy_502_gives_local_api_recovery_not_raw_error(self):
+        self.page.unroute("**/api/**")
+        api_responses = []
+        self.page.on(
+            "response",
+            lambda response: api_responses.append((response.status, response.url))
+            if "/api/" in response.url else None,
+        )
+        self.page.goto(self.base_url + "/#demo")
+        self.page.get_by_role("button", name=re.compile("Build a sample view", re.I)).click()
+        self.assertEqual(api_responses, [], "The demo builder must work before contacting an API")
+        self.page.get_by_role("button", name=re.compile("sign in.*save|save.*sign in", re.I)).click()
+        alert = self.page.get_by_role("alert")
+        self.assertIn("The local Python API is unavailable on port 18766.", alert.inner_text())
+        self.assertNotIn("Failed to fetch", alert.inner_text())
+        self.assertNotIn("Unable to reach the API", alert.inner_text())
+        self.page.get_by_text(re.compile(r"traceworth\.backend.*18766", re.I)).first.wait_for()
+        self.assertEqual(api_responses, [(502, self.base_url + "/api/config")])
+        self.page.get_by_role("button", name="Explore synthetic demo").click()
+        self.page.get_by_role("heading", name="Explore a sample assessment").wait_for()
 
     def test_demo_exit_returns_to_existing_sign_in(self):
         self.api_available = True

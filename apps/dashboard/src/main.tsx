@@ -29,13 +29,13 @@ const money = (cost:Cost)=>`${cost.amount} ${cost.currency} · ${cost.cost_basis
 function App(){
  const [session,setSession]=useState<Session|null>(null),[config,setConfig]=useState<Capabilities|null>(null),[ready,setReady]=useState(false),[error,setError]=useState('');
  const [isDemo,setIsDemo]=useState(window.location.hash==='#demo');
- async function restore(){setError('');setReady(false); try{setConfig(await api<Capabilities>('/config'));const s=await api<Session>('/auth/me');csrf=s.csrf_token;setSession(s);}catch(e){if(!(e instanceof Error && /sign in|session|authenticated|authentication/i.test(e.message)))setError(String((e as Error).message));}finally{setReady(true);}}
+ async function restore(){setError('');setReady(false); try{setConfig(await api<Capabilities>('/config'));const s=await api<Session>('/auth/me');csrf=s.csrf_token;setSession(s);}catch(e){if(!(e instanceof Error && /sign in|session|authenticated|authentication/i.test(e.message)))setError(import.meta.env.DEV&&e instanceof Error&&['Failed to fetch','Unable to reach the API. Retry shortly or contact your administrator.'].includes(e.message)?'The local Python API is unavailable on port 18766.':String((e as Error).message));}finally{setReady(true);}}
  useEffect(()=>{const route=()=>setIsDemo(window.location.hash==='#demo');window.addEventListener('hashchange',route);return()=>window.removeEventListener('hashchange',route);},[]);
  useEffect(()=>{if(!isDemo)void restore();},[isDemo]);
  useEffect(()=>{const expired=()=>{csrf='';setSession(null);};window.addEventListener('session-expired',expired);return()=>window.removeEventListener('session-expired',expired);},[]);
  if(isDemo)return <DemoWorkspace website={website}/>;
  if(!ready)return <div className="startup">Opening your workspace…</div>;
- if(!config)return <div className="startup"><p role="alert">{error||'Workspace configuration is unavailable.'}</p><button className="button primary" onClick={()=>void restore()}>Retry connection</button><button className="button secondary" onClick={()=>{window.location.hash='demo';}}>Explore synthetic demo</button></div>;
+ if(!config)return <div className="startup"><p role="alert">{error||'Workspace configuration is unavailable.'}</p>{import.meta.env.DEV&&<p>To use the workspace locally, start the Python API in another terminal from the repository root:<br/><code>.\.venv\Scripts\python.exe -m traceworth.backend --port 18766 --database local-data/traceworth.db</code></p>}<button className="button primary" onClick={()=>void restore()}>Retry connection</button><button className="button secondary" onClick={()=>{window.location.hash='demo';}}>Explore synthetic demo</button></div>;
  return session?<Workspace config={config} session={session} logout={async()=>{await api('/auth/logout','POST');csrf='';setSession(null);}}/>:<Auth config={config} error={error} done={s=>{csrf=s.csrf_token;setSession(s);setError('');}}/>;
 }
 function Auth({done,error:initial,config}:{done:(s:Session)=>void,error:string,config:Capabilities}){
