@@ -1,5 +1,6 @@
 """Real-browser creator acceptance against an isolated Vite/FastAPI/SQLite stack."""
 
+import json
 import os
 from pathlib import Path
 import re
@@ -21,6 +22,9 @@ DASHBOARD = ROOT / "apps" / "dashboard"
 VITE = ROOT / "node_modules" / "vite" / "bin" / "vite.js"
 CHROME = Path(os.environ.get("TRACEWORTH_TEST_CHROME", r"C:\Program Files\Google\Chrome\Application\chrome.exe"))
 PASSWORD = "temporary-browser-password-123!"
+DEMO_ASSISTANT = next(cohort for cohort in json.loads(
+    (DASHBOARD / "src" / "demo-report.json").read_text(encoding="utf-8"))["report"]["cohorts"]
+    if cohort["application_id"] == "assistant-service")
 
 
 class DashboardBuilderBrowserAcceptance(unittest.TestCase):
@@ -291,7 +295,8 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         self.assertIn("1 / 2\nwith an explicit outcome", summary.inner_text())
         self.assertIn("1 / 2\nusage events with a price", summary.inner_text())
         self.assertIn("1 usage event with unknown cost", summary.inner_text())
-        run_rows = overview.get_by_role("button", name=re.compile("Inspect Run"))
+        run_rows = overview.get_by_role("group", name="Recorded cost by run · Horizontal bars").get_by_role(
+            "button", name=re.compile("Inspect Run"))
         self.assertEqual(run_rows.count(), 2)
         self.assertEqual(sum("0.03 USD" in text for text in run_rows.all_inner_texts()), 1)
         self.assertEqual(sum("No comparable price" in text for text in run_rows.all_inner_texts()), 1)
@@ -404,15 +409,16 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         cost_card = preview.locator(".chart-card").nth(2)
         cost_card.get_by_text("View chart data").click()
         cost_table = cost_card.locator(".chart-data-table table").inner_text()
-        self.assertIn("0.014 USD · estimated", cost_table)
-        self.assertIn("0.035 USD · estimated", cost_table)
-        self.assertIn("No comparable price", cost_table)
+        for workflow in DEMO_ASSISTANT["workflows"][:2]:
+            self.assertIn(f"{workflow['costs'][0]['amount']} USD · estimated", cost_table)
+        self.assertIn("unknown cost", cost_table)
         self.assertIn("unknown and other costs are excluded", cost_card.inner_text())
         editor.get_by_label("Chart 3 dataset").select_option("workflow_status")
         preview.get_by_role("group", name="Workflow status · Pie").wait_for()
         editor.get_by_label("Chart 3 visualization").select_option("horizontal_bar")
         status_chart = preview.get_by_role("group", name="Workflow status · Horizontal bars")
-        point = status_chart.get_by_role("button", name=re.compile("completed: 3"))
+        point = status_chart.get_by_role("button", name=re.compile(
+            f"completed: {DEMO_ASSISTANT['summary']['completed_workflows']}"))
         point.focus()
         self.page.keyboard.press("Enter")
         self.assertEqual(point.get_attribute("aria-pressed"), "true")
@@ -433,21 +439,22 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         editor.get_by_label("Chart 6 width").select_option("full")
         trend = preview.get_by_role("group", name="Duration by run · Trend")
         self.assertEqual(preview.locator(".chart-card").count(), 4)
-        run = trend.get_by_role("button", name=re.compile("Run 1"))
+        run = trend.get_by_role("button").first
         run.focus()
         self.page.keyboard.press("Enter")
         self.assertEqual(run.get_attribute("aria-pressed"), "true")
         self.assertIn("caller-supplied", preview.inner_text())
         duration_card = preview.locator(".chart-card").last
         duration_card.get_by_text("View chart data").click()
-        self.assertIn("101.0 ms", duration_card.locator(".chart-data-table table").inner_text())
-        self.assertIn("137.0 ms", duration_card.locator(".chart-data-table table").inner_text())
+        duration_table = duration_card.locator(".chart-data-table table").inner_text()
+        for workflow in DEMO_ASSISTANT["workflows"][:2]:
+            self.assertIn(f"{workflow['duration_ms']:.1f} ms", duration_table)
         editor.get_by_label("Chart 6 dataset").select_option("workflows_over_time")
         daily_card = preview.locator(".chart-card").last
         daily_card.get_by_text("View chart data").click()
         daily_table = daily_card.locator(".chart-data-table table").inner_text()
-        self.assertIn("2026-01-15 UTC", daily_table)
-        self.assertIn("3", daily_table)
+        self.assertIn("2026-02-01 UTC", daily_table)
+        self.assertEqual(daily_card.locator(".chart-data-table tbody tr").count(), 18)
         self.assertIn("Missing days are not zero-activity days", daily_card.inner_text())
         self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"),
                              self.page.evaluate("document.documentElement.clientWidth") + 1)

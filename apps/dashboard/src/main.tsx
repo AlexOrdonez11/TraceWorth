@@ -1,11 +1,12 @@
-import {useEffect, useState, useRef, type FormEvent} from 'react';
+import {lazy, Suspense, useEffect, useState, useRef, type FormEvent} from 'react';
 import {createRoot} from 'react-dom/client';
 import {Brand} from '../../../packages/ui/Brand';
-import {DemoWorkspace} from './DemoWorkspace';
 import {DashboardCreator} from './DashboardCreator';
 import {OverviewVisuals} from './OverviewVisuals';
 import '../../../packages/ui/styles.css';
 import './workspace.css';
+
+const DemoWorkspace=lazy(()=>import('./DemoWorkspace').then(module=>({default:module.DemoWorkspace})));
 
 type Session = {user:{email:string},account:{id:string,name:string},csrf_token:string};
 type Application = {id:string,name:string,slug:string};
@@ -34,7 +35,7 @@ function App(){
  useEffect(()=>{const route=()=>setIsDemo(window.location.hash==='#demo');window.addEventListener('hashchange',route);return()=>window.removeEventListener('hashchange',route);},[]);
  useEffect(()=>{if(!isDemo)void restore();},[isDemo]);
  useEffect(()=>{const expired=()=>{csrf='';setSession(null);};window.addEventListener('session-expired',expired);return()=>window.removeEventListener('session-expired',expired);},[]);
- if(isDemo)return <DemoWorkspace website={website}/>;
+ if(isDemo)return <Suspense fallback={<div className="startup">Opening synthetic demo…</div>}><DemoWorkspace website={website}/></Suspense>;
  if(!ready)return <div className="startup">Opening your workspace…</div>;
  if(!config)return <div className="startup"><p role="alert">{error||'Workspace configuration is unavailable.'}</p>{import.meta.env.DEV&&<p>To use the workspace locally, start the Python API in another terminal from the repository root:<br/><code>.\.venv\Scripts\python.exe -m traceworth.backend --port 18766 --database local-data/traceworth.db</code></p>}<button className="button primary" onClick={()=>void restore()}>Retry connection</button><button className="button secondary" onClick={()=>{window.location.hash='demo';}}>Explore synthetic demo</button></div>;
  return session?<Workspace config={config} session={session} logout={async()=>{await api('/auth/logout','POST');csrf='';setSession(null);}}/>:<Auth config={config} error={error} done={s=>{csrf=s.csrf_token;setSession(s);setError('');}}/>;

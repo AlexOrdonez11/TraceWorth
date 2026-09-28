@@ -1,5 +1,36 @@
 # Local MVP agent workflow
 
+## Richer synthetic demo — September 28, 2026
+
+The owner wants substantially more data and visual depth in the public demo.
+This milestone expands only the API-free synthetic sample: several fictional
+organizations, client groups, and users; many workflows spread across days;
+deeper steps, usage, outcomes, known/unknown costs, and failures. The Overview
+must expose at least four useful plots and let visitors explore application and
+fictional context without presenting these labels as supported account roles or
+live telemetry. All displayed aggregate figures must be derived from the same
+sample records; filtering must not leave stale findings or cost totals. Existing
+signed-in account behavior, SDK, and backend ownership model stay unchanged.
+
+| Task | File owner | Acceptance |
+| --- | --- | --- |
+| Deterministic fixture and demo interface | Developer: `apps/dashboard/src/` and demo generation script under `scripts/` | Reproducible assessed sample, at least three organizations/five client groups/eight users and 40 workflows across 14 days; four responsive, distinct Overview plots including time and duration; explicit context filters and scoped labels; coherent run inspection and saved-view preview; synthetic/API-free boundaries |
+| Independent regression | Testing agent: `tests/` | Generated fixture consistency and browser checks for filter isolation, exact summaries, unknown/partial costs, date trend, chart toggles, mobile/keyboard, builder, and zero public API calls; preserve older behavior where applicable |
+| Usability review | Reviewer: read-only actual browser | Explore desktop/phone demo, context navigation, plot legibility, empty slices, run details, creator preview, and synthetic provenance; report prioritized reproduction steps |
+
+Status: accepted locally. The coordinator owns task triage, documentation, and
+final integration. The developer generated 54 workflows across 18 days from
+843 valid synthetic events and built assessed context slices. Independent tests
+passed: 5/5 fixture/generator checks, 17/17 public demo browser cases, 8/8
+signed-in dashboard browser cases, and the complete 180-test Python suite
+(34 PostgreSQL integration skips without a disposable DSN). Typecheck and both
+production builds passed. Actual-browser usability review at desktop and phone
+widths passed after sparse-day chart, approximate-cost, mobile chart scroll,
+website preview, empty-state, all-unpriced, and copy fixes were retested. The
+public demo made no API calls. Client and user names in this sample are
+presentation context, not account authorization, team management, or measured
+production traffic.
+
 ## Visual application overview — September 28, 2026
 
 The owner wants the main dashboard view to benefit from the configurable chart
