@@ -1,5 +1,55 @@
 # Local MVP agent workflow
 
+## Demo-to-workspace API recovery — September 28, 2026
+
+Reported failure: the public demo composer works without the API, but its
+**Open workspace** link exits to sign-in. With the local FastAPI process stopped,
+Vite returns 502 for `/api/config`, and the generic error makes this look like
+a demo editor failure. The coordinator reproduced this with the API offline,
+backed up the existing local SQLite file, started the API, and verified that
+demo-to-sign-in then succeeds. The demo must remain API-free.
+
+| Task | Owner | Acceptance |
+| --- | --- | --- |
+| Explain transition and local recovery | Developer: dashboard UI | Sign-in CTA describes saving; local API-offline screen names the missing service and start command, with retry/demo recovery; cloud message remains generic |
+| Independent regression | Testing agent: `tests/` | API-offline demo composer has zero API calls; sign-in transition shows actionable recovery; API-on transition opens sign-in |
+| Usability review | Reviewer: actual browser | Recheck offline and restored journeys for clarity, including the previously reported error |
+
+Status: accepted locally. Fourteen independent demo browser cases pass,
+including an actual Vite 502 with the API port stopped, and the reviewer
+rechecked the offline and restored journeys at phone width. No telemetry or
+account data was removed; the local database backup is under ignored
+`local-data/`.
+
+## Custom dashboard creator milestone — September 27, 2026
+
+The owner requested a more useful public demo and a tool for users to create
+their own dashboards. This milestone adds a bounded local MVP: signed-in owners
+can save named, application-scoped dashboards assembled from a fixed library of
+report widgets, reorder or remove widgets, reopen and edit a saved view, and
+delete it. The read-only public demo can try layouts in memory but must not
+write to an account or API. Widgets use the bounded received-time assessment;
+unknown costs and partial reports remain explicit. No arbitrary query, HTML,
+cross-account sharing, or automated recommendations are in scope.
+
+| Task | File owner | Acceptance |
+| --- | --- | --- |
+| Account-scoped storage/API | Developer: `src/traceworth/backend/` | Ordered SQLite/PostgreSQL migration; strict widget/name bounds; authenticated CRUD with CSRF and exact origin on mutations; application ownership and cross-account isolation; ingestion keys cannot read or write dashboards |
+| Dashboard creator and demo redesign | Coordinator: `apps/dashboard/src/`, docs | Widget library, add/remove/reorder/edit/save/delete flow, application selection and empty states; demo offers in-memory customization and clearer narrative; cloud UI gates creator until API advertises support |
+| Independent acceptance | Testing agent: `tests/` | CRUD/isolation/CSRF/validation/migration regressions plus actual-browser builder/demo journeys, reload persistence, mobile and no-API public demo |
+| Usability review | Reviewer: read-only actual browser | Check creation, editing, deletion, empty/partial data, application switching, demo clarity, keyboard/mobile use, and recovery from failures |
+
+Status: accepted locally. Independent tests passed 162 cases (34 PostgreSQL
+integration skips without a disposable test DSN); five builder browser cases
+cover persistence, cohort switching, mobile/keyboard operation, demo isolation,
+and failed-save retry. The usability reviewer retested at desktop and phone
+widths with a disposable SQLite database and found no blocking issue. The
+existing staging API remains unchanged until a reviewed migration and separate
+release gate. The static demo refresh was published to the staging dashboard
+CloudFront distribution; its `/#demo` route was checked after invalidation with
+four sample widgets and zero `/api` requests. The hosted authenticated creator
+remains gated until the backend migration and API release.
+
 ## Landing and demo visualization milestone — September 27, 2026
 
 The owner requested a more polished landing page and account-free demo with

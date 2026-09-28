@@ -74,7 +74,7 @@ def provision_runtime_role(database, username, password):
         db.execute(sql.SQL('REVOKE ALL ON SCHEMA public FROM {}').format(sql.Identifier(username)))
         db.execute(sql.SQL('GRANT USAGE ON SCHEMA public TO {}').format(sql.Identifier(username)))
         db.execute(sql.SQL('REVOKE ALL ON ALL TABLES IN SCHEMA public FROM {}').format(sql.Identifier(username)))
-        for table in ('accounts', 'users', 'sessions', 'applications', 'api_keys', 'events'):
+        for table in ('accounts', 'users', 'sessions', 'applications', 'api_keys', 'events', 'dashboards'):
             db.execute(sql.SQL('GRANT SELECT,INSERT,UPDATE,DELETE ON TABLE {} TO {}').format(sql.Identifier(table), sql.Identifier(username)))
         db.execute(sql.SQL('GRANT SELECT ON TABLE schema_migrations TO {}').format(sql.Identifier(username)))
     return {'runtime_role': username, 'status': 'provisioned'}

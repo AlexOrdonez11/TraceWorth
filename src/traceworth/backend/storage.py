@@ -5,7 +5,7 @@ import json
 from pathlib import Path
 import sqlite3
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 SCHEMA = '''
 CREATE TABLE IF NOT EXISTS accounts(id TEXT PRIMARY KEY, name TEXT NOT NULL, created_at TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS users(id TEXT PRIMARY KEY, account_id TEXT NOT NULL REFERENCES accounts(id), email TEXT UNIQUE NOT NULL, password_hash TEXT NOT NULL);
@@ -19,6 +19,20 @@ INDEXES = '''
 CREATE INDEX IF NOT EXISTS events_account_received ON events(account_id,received_at,application_id,event_id);
 CREATE INDEX IF NOT EXISTS events_application_received ON events(account_id,application_id,received_at,event_id);
 CREATE INDEX IF NOT EXISTS events_retention_received ON events(received_at);
+'''
+DASHBOARDS = '''
+CREATE TABLE IF NOT EXISTS dashboards(
+    id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL REFERENCES accounts(id),
+    application_id TEXT NOT NULL,
+    name TEXT NOT NULL,
+    widgets TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY(account_id,application_id) REFERENCES applications(account_id,id)
+);
+CREATE INDEX IF NOT EXISTS dashboards_account_application ON dashboards(account_id,application_id,created_at,id);
+CREATE INDEX IF NOT EXISTS dashboards_account_created ON dashboards(account_id,created_at,id);
 '''
 
 class StorageIntegrityError(Exception):
@@ -86,10 +100,10 @@ class Database:
             db.execute('SELECT pg_advisory_xact_lock(782341095)' if self.postgres else 'BEGIN IMMEDIATE')
             db.execute('CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY, applied_at TEXT NOT NULL)')
             versions = {row['version'] for row in db.execute('SELECT version FROM schema_migrations').fetchall()}
-            if versions - {1, 2}:
+            if versions - {1, 2, 3}:
                 raise RuntimeError('Database schema is newer than this application')
             schema = SCHEMA.replace('expires_at REAL', 'expires_at DOUBLE PRECISION').replace('payload TEXT', 'payload JSONB') if self.postgres else SCHEMA
-            for version, commands in [(1, schema), (2, INDEXES)]:
+            for version, commands in [(1, schema), (2, INDEXES), (3, DASHBOARDS)]:
                 if version not in versions:
                     for statement in commands.split(';'):
                         if statement.strip():
@@ -100,7 +114,7 @@ class Database:
     def ready(self):
         with self.connect() as db:
             versions = {row['version'] for row in db.execute('SELECT version FROM schema_migrations').fetchall()}
-            return versions == {1, 2}
+            return versions == {1, 2, 3}
 
     def close(self):
         if self.pool:

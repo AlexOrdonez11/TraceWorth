@@ -16,7 +16,8 @@ from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from typing import Literal
 
 from ..assessment import assess_events
 from ..sdk import TraceWorth
@@ -81,6 +82,63 @@ class KeyInput(StrictModel):
 
 class EventBatch(StrictModel):
     events: list[dict] = Field(min_length=1, max_length=500)
+
+
+WidgetType = Literal[
+    'metric_workflows', 'metric_acceptance', 'metric_unknown_cost',
+    'cost_breakdown', 'usage_coverage', 'workflow_comparison',
+    'findings', 'workflow_list',
+]
+
+
+class DashboardWidget(StrictModel):
+    type: WidgetType
+    width: Literal['half', 'full']
+
+
+class DashboardInput(StrictModel):
+    name: str
+    application_id: str = Field(min_length=1, max_length=128)
+    widgets: list[DashboardWidget] = Field(min_length=1, max_length=8)
+
+    @field_validator('application_id')
+    @classmethod
+    def valid_application_id(cls, value):
+        if not value.isprintable():
+            raise ValueError('Application ID must use printable characters')
+        return value
+
+    @field_validator('name')
+    @classmethod
+    def valid_name(cls, value):
+        cleaned = value.strip()
+        if not 1 <= len(cleaned) <= 80:
+            raise ValueError('Dashboard name must contain 1–80 characters')
+        if not cleaned.isprintable():
+            raise ValueError('Dashboard name must use printable characters')
+        return cleaned
+
+    @field_validator('widgets')
+    @classmethod
+    def unique_widgets(cls, value):
+        if len({widget.type for widget in value}) != len(value):
+            raise ValueError('Each widget type may appear only once')
+        return value
+
+
+class DashboardUpdate(StrictModel):
+    name: str
+    widgets: list[DashboardWidget] = Field(min_length=1, max_length=8)
+
+    @field_validator('name')
+    @classmethod
+    def valid_name(cls, value):
+        return DashboardInput.valid_name(value)
+
+    @field_validator('widgets')
+    @classmethod
+    def unique_widgets(cls, value):
+        return DashboardInput.unique_widgets(value)
 
 
 class RequestGuard:
@@ -151,7 +209,7 @@ def create_app(database_path: str | Path = 'local-data/traceworth.db', allowed_o
     app.state.database = database
     app.state.auth_limiter = AuthLimiter()
     app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True,
-                       allow_methods=['GET', 'POST', 'DELETE', 'OPTIONS'],
+                       allow_methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
                        allow_headers=['Content-Type', 'Authorization', 'X-CSRF-Token'])
     app.add_middleware(RequestGuard, allowed_origins=origins)
 
@@ -203,6 +261,17 @@ def create_app(database_path: str | Path = 'local-data/traceworth.db', allowed_o
 
     def application_list(db, account_id):
         return [dict(row) for row in db.execute('SELECT id,name,slug,created_at FROM applications WHERE account_id=? ORDER BY created_at,id', (account_id,))]
+
+    def dashboard_record(row):
+        result = dict(row)
+        result['widgets'] = json.loads(result['widgets'])
+        return result
+
+    def dashboard(db, account_id, dashboard_id):
+        row = db.execute('SELECT id,application_id,name,widgets,created_at,updated_at FROM dashboards WHERE id=? AND account_id=?', (dashboard_id, account_id)).fetchone()
+        if not row:
+            raise HTTPException(404, 'Dashboard not found')
+        return dashboard_record(row)
 
     def store_events(db, account_id, application_id, slug, events):
         payloads = []
@@ -261,7 +330,8 @@ def create_app(database_path: str | Path = 'local-data/traceworth.db', allowed_o
     @app.get('/api/config')
     def public_config():
         return {'mode': 'cloud' if cloud_mode else 'local', 'registration_enabled': not cloud_mode,
-                'demo_enabled': not cloud_mode, 'metrics_max_events': metrics_max_events,
+                'demo_enabled': not cloud_mode, 'dashboard_builder_enabled': True,
+                'metrics_max_events': metrics_max_events,
                 'metrics_window_days': metrics_window_days}
 
     @app.post('/api/auth/register', status_code=201)
@@ -313,6 +383,63 @@ def create_app(database_path: str | Path = 'local-data/traceworth.db', allowed_o
         with database.connect() as db:
             user = identity(request, db)
             return {'applications': application_list(db, user['account_id'])}
+
+    @app.get('/api/dashboards')
+    def dashboards(request: Request, application_id: str | None = None):
+        with database.connect() as db:
+            user = identity(request, db)
+            if application_id is not None:
+                application(db, user['account_id'], application_id)
+                rows = db.execute('SELECT id,application_id,name,widgets,created_at,updated_at FROM dashboards WHERE account_id=? AND application_id=? ORDER BY created_at,id', (user['account_id'], application_id)).fetchall()
+            else:
+                rows = db.execute('SELECT id,application_id,name,widgets,created_at,updated_at FROM dashboards WHERE account_id=? ORDER BY created_at,id', (user['account_id'],)).fetchall()
+            return {'dashboards': [dashboard_record(row) for row in rows]}
+
+    @app.get('/api/dashboards/{dashboard_id}')
+    def get_dashboard(dashboard_id: str, request: Request):
+        with database.connect() as db:
+            user = identity(request, db)
+            return {'dashboard': dashboard(db, user['account_id'], dashboard_id)}
+
+    @app.post('/api/dashboards', status_code=201)
+    def add_dashboard(data: DashboardInput, request: Request):
+        with database.connect() as db:
+            user = identity(request, db, csrf=True)
+            # Serialize creates per account, including requests to different apps.
+            if database.postgres:
+                db.execute('SELECT id FROM accounts WHERE id=? FOR UPDATE', (user['account_id'],))
+            else:
+                db.execute('BEGIN IMMEDIATE')
+            application(db, user['account_id'], data.application_id)
+            count = db.execute('SELECT COUNT(*) AS total FROM dashboards WHERE account_id=?', (user['account_id'],)).fetchone()['total']
+            if count >= 25:
+                raise HTTPException(409, 'Dashboard limit of 25 per account reached')
+            dashboard_id, created_at = str(uuid4()), now_iso()
+            db.execute('INSERT INTO dashboards(id,account_id,application_id,name,widgets,created_at,updated_at) VALUES(?,?,?,?,?,?,?)',
+                       (dashboard_id, user['account_id'], data.application_id, data.name,
+                        json.dumps([widget.model_dump() for widget in data.widgets], separators=(',', ':')),
+                        created_at, created_at))
+            return {'dashboard': dashboard(db, user['account_id'], dashboard_id)}
+
+    @app.put('/api/dashboards/{dashboard_id}')
+    def update_dashboard(dashboard_id: str, data: DashboardUpdate, request: Request):
+        with database.connect() as db:
+            user = identity(request, db, csrf=True)
+            updated = db.execute('UPDATE dashboards SET name=?,widgets=?,updated_at=? WHERE id=? AND account_id=?',
+                                 (data.name, json.dumps([widget.model_dump() for widget in data.widgets], separators=(',', ':')),
+                                  now_iso(), dashboard_id, user['account_id']))
+            if not updated.rowcount:
+                raise HTTPException(404, 'Dashboard not found')
+            return {'dashboard': dashboard(db, user['account_id'], dashboard_id)}
+
+    @app.delete('/api/dashboards/{dashboard_id}', status_code=204)
+    def delete_dashboard(dashboard_id: str, request: Request):
+        with database.connect() as db:
+            user = identity(request, db, csrf=True)
+            deleted = db.execute('DELETE FROM dashboards WHERE id=? AND account_id=?', (dashboard_id, user['account_id']))
+            if not deleted.rowcount:
+                raise HTTPException(404, 'Dashboard not found')
+        return Response(status_code=204)
 
     @app.post('/api/applications', status_code=201)
     def add_application(data: ApplicationInput, request: Request):
