@@ -1,5 +1,38 @@
 # Local MVP agent workflow
 
+## Configurable dashboard charts — September 28, 2026
+
+The owner clarified that an editable dashboard must let a user choose different
+plots, not only rearrange fixed evidence cards. This bounded milestone adds a
+chart widget to the existing local dashboard composer and API. Each chart has
+its own identifier so a dashboard may contain more than one chart, a selected
+visualization (`horizontal_bar`, `vertical_bar`, `pie`, or `trend`), and a
+selected dataset. Distribution datasets cover recorded workflow status and
+explicit outcome; per-run datasets cover usage-event count, comparable priced
+cost, and recorded duration; a daily workflow-start dataset may use recorded
+root-step timestamps. The UI offers only compatible chart/dataset pairs. The
+same configuration works in the API-free synthetic demo and saved account
+dashboards. Existing saved fixed widgets remain readable and editable.
+
+| Task | File owner | Acceptance |
+| --- | --- | --- |
+| Chart configuration API | Developer: `src/traceworth/backend/app.py` | Strict allowlist, compatible pairs, unique chart IDs, at most eight widgets, account/CSRF protection unchanged; old layouts remain valid; no new migration unless necessary |
+| Chart composer/rendering | Developer: `apps/dashboard/src/` | Multiple independently configured charts, accessible responsive SVG/HTML with keyboard/touch inspection, preview and save/reopen behavior, clear empty/partial/unknown-price states; no arbitrary query or fabricated data |
+| Independent acceptance | Testing agent: `tests/` | API validation/legacy regression, browser chart type/dataset changes, duplicate charts, save/reopen, API-free demo, small screen and keyboard |
+| Usability review | Reviewer: read-only actual browser | Explore demo and signed-in charts, chart interpretation, plot controls, recovery, and mobile layout; report exact steps and priorities |
+
+Status: accepted locally. The full Python suite passed 169 tests with 34
+PostgreSQL integration skips (no disposable test DSN); seven independent
+builder browser cases passed on the final UI. Typecheck and both production
+builds passed. The reviewer exercised demo and saved charts at desktop and
+phone widths with no blocking finding. Reviewer follow-up P3: trend point touch targets
+are about 23 × 20 px; taps worked, but larger targets would help finger use.
+Trend x-axis uses the recorded root-step start time, which is
+caller-supplied; an absent or sparse timestamp must not be shown as a verified
+continuous trend. Cost plots compare only one labeled currency and price basis,
+excluding unknown prices. No arbitrary user query, external data source, or
+automatic improvement claim is included.
+
 ## Demo-to-workspace API recovery — September 28, 2026
 
 Reported failure: the public demo composer works without the API, but its

@@ -100,6 +100,13 @@ events in memory, not stored as derived warehouse tables. There is no automatic
 sample data at registration; demo seeding is an explicit owner action scoped to
 an application and labeled synthetic. See [local web setup](local-web.md).
 
+Account dashboards store bounded layout definitions, including fixed evidence
+cards and independently configured chart widgets. A chart selects an allowed
+dataset and compatible bar, pie, or trend visualization; it does not store an
+arbitrary query or copy of the assessment. Rendering uses the current bounded
+account/application/cohort report. The public synthetic demo uses the same
+chart editor entirely in browser memory and does not save a layout.
+
 The earlier standard-library JSONL viewer (`traceworth serve`) remains separate,
 without accounts or persistent imports. Its port-18765 examples do not refer to
 the new React dashboard.

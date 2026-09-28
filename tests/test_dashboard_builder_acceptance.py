@@ -41,6 +41,19 @@ ALL_TYPES = (
     "cost_breakdown", "usage_coverage", "workflow_comparison",
     "findings", "workflow_list",
 )
+CHART_PAIRS = {
+    "workflow_status": ("horizontal_bar", "vertical_bar", "pie"),
+    "workflow_outcome": ("horizontal_bar", "vertical_bar", "pie"),
+    "usage_by_run": ("horizontal_bar", "vertical_bar", "trend"),
+    "cost_by_run": ("horizontal_bar", "vertical_bar", "trend"),
+    "duration_by_run": ("horizontal_bar", "vertical_bar", "trend"),
+    "workflows_over_time": ("vertical_bar", "trend"),
+}
+
+
+def chart(dataset="workflow_status", visualization="pie", *, identity=None, width="half"):
+    return {"type": "chart", "id": identity or str(uuid4()), "width": width,
+            "visualization": visualization, "dataset": dataset}
 
 
 class DashboardBuilderAcceptance(unittest.TestCase):
@@ -254,6 +267,102 @@ class DashboardBuilderAcceptance(unittest.TestCase):
         self.create_dashboard(client=self.bob, headers=self.bob_headers, application_id=self.bob_app["id"])
         self.assertEqual(len(self.bob.get("/api/dashboards").json()["dashboards"]), 1)
 
+    def test_multiple_charts_and_legacy_widgets_survive_create_edit_and_reopen(self):
+        first = chart("workflow_status", "pie")
+        second = chart("cost_by_run", "trend", width="full")
+        widgets = [WIDGETS[0], first, second, WIDGETS[1]]
+        response = self.alice.post(
+            "/api/dashboards",
+            json={"name": "Evidence charts", "application_id": self.alice_app["id"], "widgets": widgets},
+            headers=self.alice_headers,
+        )
+        self.assertEqual(response.status_code, 201, response.text)
+        saved = response.json()["dashboard"]
+        self.assertEqual(saved["widgets"], widgets)
+        self.assertEqual(len({item["id"] for item in saved["widgets"] if item["type"] == "chart"}), 2)
+        self.assertEqual(self.alice.get(f"/api/dashboards/{saved['id']}").json()["dashboard"]["widgets"], widgets)
+
+        # An older fixed-card layout can be reopened and edited into a mixed layout.
+        legacy = self.create_dashboard(name="Old layout")
+        self.assertEqual(legacy["widgets"], WIDGETS)
+        updated_widgets = [WIDGETS[0], chart("workflows_over_time", "vertical_bar", width="full"), WIDGETS[1]]
+        updated = self.alice.put(
+            f"/api/dashboards/{legacy['id']}",
+            json={"name": "Old layout with chart", "widgets": updated_widgets},
+            headers=self.alice_headers,
+        )
+        self.assertEqual(updated.status_code, 200, updated.text)
+        self.assertEqual(updated.json()["dashboard"]["widgets"], updated_widgets)
+        reopened = create_app(database_path=self.database, allowed_origins=[ORIGIN])
+        with closing(TestClient(reopened)) as fresh:
+            login = fresh.post("/api/auth/login", json={"email": "alice@example.test", "password": PASSWORD})
+            self.assertEqual(login.status_code, 200, login.text)
+            self.assertEqual(fresh.get(f"/api/dashboards/{saved['id']}").json()["dashboard"]["widgets"], widgets)
+            self.assertEqual(fresh.get(f"/api/dashboards/{legacy['id']}").json()["dashboard"]["widgets"], updated_widgets)
+        self.assertEqual(self.bob.get("/api/dashboards").json()["dashboards"], [])
+        self.assertEqual(self.bob.get(f"/api/dashboards/{saved['id']}").status_code, 404)
+        foreign_update = self.bob.put(
+            f"/api/dashboards/{saved['id']}",
+            json={"name": "Foreign", "widgets": [chart()]}, headers=self.bob_headers,
+        )
+        self.assertEqual(foreign_update.status_code, 404, foreign_update.text)
+
+    def test_chart_pair_allowlist_and_canonical_uuid(self):
+        dashboard = self.create_dashboard()
+        for dataset, visualizations in CHART_PAIRS.items():
+            for visualization in ("horizontal_bar", "vertical_bar", "pie", "trend"):
+                with self.subTest(dataset=dataset, visualization=visualization):
+                    response = self.alice.put(
+                        f"/api/dashboards/{dashboard['id']}",
+                        json={"name": "Pair validation", "widgets": [chart(dataset, visualization)]},
+                        headers=self.alice_headers,
+                    )
+                    self.assertEqual(response.status_code, 200 if visualization in visualizations else 422,
+                                     response.text)
+        uppercase_id = str(uuid4()).upper()
+        response = self.alice.put(
+            f"/api/dashboards/{dashboard['id']}",
+            json={"name": "Canonical", "widgets": [chart(identity=uppercase_id)]},
+            headers=self.alice_headers,
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        self.assertEqual(response.json()["dashboard"]["widgets"][0]["id"], uppercase_id.lower())
+
+    def test_chart_schema_rejects_invalid_ids_types_pairs_and_extras_atomically(self):
+        existing = self.create_dashboard()
+        duplicate_id = str(uuid4())
+        invalid_widgets = (
+            [chart(identity="not-a-uuid")],
+            [chart(identity=uuid4().hex)],
+            [chart(identity="urn:uuid:" + str(uuid4()))],
+            [{"type": "chart", "width": "full", "visualization": "pie", "dataset": "workflow_status"}],
+            [chart(dataset="unexpected_dataset")],
+            [chart(visualization="scatter")],
+            [chart("workflows_over_time", "pie")],
+            [chart("usage_by_run", "pie")],
+            [dict(chart(), query="SELECT * FROM events")],
+            [dict(WIDGETS[0], id=str(uuid4()))],
+            [chart(identity=duplicate_id), chart("cost_by_run", "trend", identity=duplicate_id)],
+            [chart() for _ in range(9)],
+            [],
+        )
+        before = self.alice.get(f"/api/dashboards/{existing['id']}").json()["dashboard"]
+        for widgets in invalid_widgets:
+            with self.subTest(widgets=widgets):
+                create = self.alice.post(
+                    "/api/dashboards",
+                    json={"name": "Rejected chart", "application_id": self.alice_app["id"], "widgets": widgets},
+                    headers=self.alice_headers,
+                )
+                self.assertEqual(create.status_code, 422, create.text)
+                update = self.alice.put(
+                    f"/api/dashboards/{existing['id']}",
+                    json={"name": "Rejected chart", "widgets": widgets}, headers=self.alice_headers,
+                )
+                self.assertEqual(update.status_code, 422, update.text)
+                self.assertEqual(self.alice.get(f"/api/dashboards/{existing['id']}").json()["dashboard"], before)
+        self.assertEqual(len(self.alice.get("/api/dashboards").json()["dashboards"]), 1)
+
 
 class DashboardMigrationAcceptance(unittest.TestCase):
     def test_v2_database_migrates_without_erasing_existing_telemetry(self):
@@ -328,14 +437,15 @@ class PostgreSQLDashboardAcceptance(unittest.TestCase):
                     )
                     self.assertEqual(login.status_code, 200, login.text)
                     csrf = login.json()["csrf_token"]
+                    runtime_widgets = [WIDGETS[0], chart("cost_by_run", "trend", width="full")]
                     saved = client.post(
                         "/api/dashboards",
-                        json={"name": "Runtime dashboard", "application_id": application_id, "widgets": WIDGETS},
+                        json={"name": "Runtime dashboard", "application_id": application_id, "widgets": runtime_widgets},
                         headers={"Origin": "https://dashboard.example.test", "X-CSRF-Token": csrf},
                     )
                     self.assertEqual(saved.status_code, 201, saved.text)
                     dashboard_id = saved.json()["dashboard"]["id"]
-                    self.assertEqual(client.get(f"/api/dashboards/{dashboard_id}").json()["dashboard"]["widgets"], WIDGETS)
+                    self.assertEqual(client.get(f"/api/dashboards/{dashboard_id}").json()["dashboard"]["widgets"], runtime_widgets)
                     removed = client.delete(
                         f"/api/dashboards/{dashboard_id}",
                         headers={"Origin": "https://dashboard.example.test", "X-CSRF-Token": csrf},

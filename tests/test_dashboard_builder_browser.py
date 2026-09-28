@@ -2,6 +2,7 @@
 
 import os
 from pathlib import Path
+import re
 import socket
 import subprocess
 import sys
@@ -131,7 +132,7 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         self.page.get_by_label("Dashboard name").fill("Quality and cost")
         editor = self.page.get_by_role("region", name="Dashboard layout editor")
         editor.get_by_role("button", name="Move Workflow volume down").click()
-        editor.get_by_role("button", name="Remove Workflow comparison").click()
+        editor.get_by_role("button", name="Remove Chart · Recorded cost by run").click()
         editor.locator('.builder-gallery button:has(strong:text-is("Recorded cost"))').click()
         editor.get_by_label("Recorded cost width").select_option("full")
         self.page.get_by_role("button", name="Create dashboard", exact=True).click()
@@ -144,7 +145,7 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["name"], "Quality and cost")
         self.assertEqual([item["type"] for item in records[0]["widgets"]],
-                         ["metric_acceptance", "metric_workflows", "usage_coverage", "cost_breakdown"])
+                         ["metric_acceptance", "metric_workflows", "chart", "chart", "cost_breakdown"])
 
         self.page.reload()
         self.page.get_by_role("navigation").get_by_role("button", name="Dashboards").click()
@@ -230,20 +231,20 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         name = self.page.get_by_label("Dashboard name")
         name.fill("Retry this layout")
         editor = self.page.get_by_role("region", name="Dashboard layout editor")
-        editor.get_by_role("button", name="Remove Workflow comparison").click()
+        editor.get_by_role("button", name="Remove Chart · Recorded cost by run").click()
         self.page.route("**/api/dashboards", lambda route: route.abort("failed"), times=1)
         self.page.get_by_role("button", name="Create dashboard", exact=True).click()
         alert = self.page.get_by_role("alert")
         self.assertIn("Could not reach the API", alert.inner_text())
         self.assertIn("Your name and layout are still here", alert.inner_text())
         self.assertEqual(name.input_value(), "Retry this layout")
-        self.assertEqual(editor.locator(".builder-widget-row").count(), 3)
+        self.assertEqual(editor.locator(".builder-widget-row").count(), 4)
         self.page.get_by_role("button", name="Create dashboard", exact=True).click()
         self.page.get_by_text("Dashboard saved for this application.").wait_for()
         saved = self.context.request.get(self.base_url + f"/api/dashboards?application_id={self.application_id}")
         self.assertEqual(saved.status, 200, saved.text())
         self.assertEqual(saved.json()["dashboards"][0]["name"], "Retry this layout")
-        self.assertEqual(len(saved.json()["dashboards"][0]["widgets"]), 3)
+        self.assertEqual(len(saved.json()["dashboards"][0]["widgets"]), 4)
 
     def test_public_demo_composer_is_local_and_resets_on_reload(self):
         requests = []
@@ -256,22 +257,123 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         editor = self.page.get_by_role("region", name="Dashboard layout editor")
         editor.get_by_role("button", name="Remove Workflow volume").focus()
         self.page.keyboard.press("Enter")
-        self.assertEqual(self.page.get_by_label("Dashboard preview").locator(".builder-widget").count(), 3)
-        editor.locator('.builder-gallery button:has(strong:text-is("Recorded cost"))').click()
         self.assertEqual(self.page.get_by_label("Dashboard preview").locator(".builder-widget").count(), 4)
+        editor.locator('.builder-gallery button:has(strong:text-is("Recorded cost"))').click()
+        self.assertEqual(self.page.get_by_label("Dashboard preview").locator(".builder-widget").count(), 5)
         self.assertIn("recorded", self.page.get_by_label("Dashboard preview").inner_text().lower())
         self.page.get_by_label("Sample application").select_option("document-indexer")
         self.assertIn("Document indexer", self.page.get_by_role("main").inner_text())
         self.page.get_by_role("button", name="Reset layout").click()
-        self.assertEqual(self.page.get_by_label("Dashboard preview").locator(".builder-widget").count(), 4)
+        self.assertEqual(self.page.get_by_label("Dashboard preview").locator(".builder-widget").count(), 5)
         self.assertLessEqual(
             self.page.evaluate("document.documentElement.scrollWidth"),
             self.page.evaluate("document.documentElement.clientWidth") + 1,
         )
         self.page.reload()
         self.page.get_by_role("navigation", name="Demo navigation").get_by_role("button", name="Build a view").click()
-        self.assertEqual(self.page.get_by_label("Dashboard preview").locator(".builder-widget").count(), 4)
+        self.assertEqual(self.page.get_by_label("Dashboard preview").locator(".builder-widget").count(), 5)
         self.assertEqual(requests, [], "Public demo customization must not use the account API")
+
+    def test_demo_chart_controls_render_distinct_plots_on_phone_without_api_calls(self):
+        requests = []
+        self.page.route("**/api/**", lambda route: (requests.append(route.request.url), route.abort()))
+        self.page.set_viewport_size({"width": 390, "height": 844})
+        self.page.goto(self.base_url + "/#demo")
+        self.page.get_by_role("button", name="Build a sample view").click()
+        editor = self.page.get_by_role("region", name="Dashboard layout editor")
+        preview = self.page.get_by_label("Dashboard preview")
+        self.assertEqual(preview.locator(".chart-card").count(), 3)
+        outcome_card = preview.locator(".chart-card").nth(0)
+        outcome_card.get_by_text("View chart data").click()
+        outcome_table = outcome_card.locator(".chart-data-table table").inner_text()
+        for label in ("Accepted", "Not accepted", "Not recorded"):
+            self.assertIn(label, outcome_table)
+        cost_card = preview.locator(".chart-card").nth(2)
+        cost_card.get_by_text("View chart data").click()
+        cost_table = cost_card.locator(".chart-data-table table").inner_text()
+        self.assertIn("0.014 USD · estimated", cost_table)
+        self.assertIn("0.035 USD · estimated", cost_table)
+        self.assertIn("No comparable price", cost_table)
+        self.assertIn("unknown and other costs are excluded", cost_card.inner_text())
+        editor.get_by_label("Chart 3 dataset").select_option("workflow_status")
+        preview.get_by_role("group", name="Workflow status · Pie").wait_for()
+        editor.get_by_label("Chart 3 visualization").select_option("horizontal_bar")
+        status_chart = preview.get_by_role("group", name="Workflow status · Horizontal bars")
+        point = status_chart.get_by_role("button", name=re.compile("completed: 3"))
+        point.focus()
+        self.page.keyboard.press("Enter")
+        self.assertEqual(point.get_attribute("aria-pressed"), "true")
+        status_chart.locator("xpath=../..").get_by_text("View chart data").click()
+        self.assertIn("completed", preview.locator(".chart-data-table table").first.inner_text())
+        editor.get_by_label("Chart 3 dataset").select_option("usage_by_run")
+        usage_chart = preview.locator(".chart-card").nth(0)
+        usage_chart.get_by_text("View chart data").click()
+        usage_table = usage_chart.locator(".chart-data-table table").inner_text()
+        self.assertIn("Run 1", usage_table)
+        self.assertIn("Run 2", usage_table)
+        self.assertIn("Run 3", usage_table)
+        self.assertIn("This is not a token total", usage_chart.inner_text())
+
+        editor.locator('.builder-gallery button:has(strong:text-is("Add chart"))').click()
+        editor.get_by_label("Chart 6 dataset").select_option("duration_by_run")
+        editor.get_by_label("Chart 6 visualization").select_option("trend")
+        editor.get_by_label("Chart 6 width").select_option("full")
+        trend = preview.get_by_role("group", name="Duration by run · Trend")
+        self.assertEqual(preview.locator(".chart-card").count(), 4)
+        run = trend.get_by_role("button", name=re.compile("Run 1"))
+        run.focus()
+        self.page.keyboard.press("Enter")
+        self.assertEqual(run.get_attribute("aria-pressed"), "true")
+        self.assertIn("caller-supplied", preview.inner_text())
+        duration_card = preview.locator(".chart-card").last
+        duration_card.get_by_text("View chart data").click()
+        self.assertIn("101.0 ms", duration_card.locator(".chart-data-table table").inner_text())
+        self.assertIn("137.0 ms", duration_card.locator(".chart-data-table table").inner_text())
+        editor.get_by_label("Chart 6 dataset").select_option("workflows_over_time")
+        daily_card = preview.locator(".chart-card").last
+        daily_card.get_by_text("View chart data").click()
+        daily_table = daily_card.locator(".chart-data-table table").inner_text()
+        self.assertIn("2026-01-15 UTC", daily_table)
+        self.assertIn("3", daily_table)
+        self.assertIn("Missing days are not zero-activity days", daily_card.inner_text())
+        self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"),
+                             self.page.evaluate("document.documentElement.clientWidth") + 1)
+        self.assertEqual(requests, [])
+
+    def test_signed_in_chart_choices_and_ids_survive_save_and_reload(self):
+        self.open_creator()
+        self.page.get_by_role("button", name="New dashboard").click()
+        editor = self.page.get_by_role("region", name="Dashboard layout editor")
+        editor.get_by_label("Chart 3 dataset").select_option("usage_by_run")
+        self.assertEqual(editor.get_by_label("Chart 3 visualization").input_value(), "horizontal_bar",
+                         "Changing away from a pie-only dataset must select a compatible visual")
+        editor.get_by_label("Chart 3 visualization").select_option("trend")
+        editor.get_by_label("Chart 3 width").select_option("full")
+        editor.locator('.builder-gallery button:has(strong:text-is("Add chart"))').click()
+        editor.get_by_label("Chart 6 dataset").select_option("workflows_over_time")
+        editor.get_by_label("Chart 6 visualization").select_option("trend")
+        self.page.get_by_label("Dashboard name").fill("Configured charts")
+        self.page.get_by_role("button", name="Create dashboard", exact=True).click()
+        self.page.get_by_text("Dashboard saved for this application.").wait_for()
+        response = self.context.request.get(self.base_url + f"/api/dashboards?application_id={self.application_id}")
+        self.assertEqual(response.status, 200, response.text())
+        saved = response.json()["dashboards"][0]
+        charts = [widget for widget in saved["widgets"] if widget["type"] == "chart"]
+        self.assertEqual(len(charts), 4)
+        self.assertEqual(len({item["id"] for item in charts}), 4)
+        self.assertEqual((charts[0]["dataset"], charts[0]["visualization"], charts[0]["width"]),
+                         ("usage_by_run", "trend", "full"))
+        self.assertEqual((charts[-1]["dataset"], charts[-1]["visualization"]),
+                         ("workflows_over_time", "trend"))
+        self.page.reload()
+        self.page.get_by_role("navigation").get_by_role("button", name="Dashboards").click()
+        self.page.get_by_label("Application", exact=True).select_option(self.application_id)
+        self.page.get_by_role("button", name="Configured charts").click()
+        self.page.get_by_role("button", name="Edit layout").click()
+        editor = self.page.get_by_role("region", name="Dashboard layout editor")
+        self.assertEqual(editor.get_by_label("Chart 3 dataset").input_value(), "usage_by_run")
+        self.assertEqual(editor.get_by_label("Chart 3 visualization").input_value(), "trend")
+        self.assertEqual(editor.get_by_label("Chart 6 dataset").input_value(), "workflows_over_time")
 
 
 if __name__ == "__main__":
