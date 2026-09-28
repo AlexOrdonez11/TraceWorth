@@ -49,9 +49,11 @@ a read-only dashboard preview generated from synthetic sample events. It does
 not create an account, application, key, or telemetry, and its values are not
 live measurements. Exit the preview to sign in or create an empty workspace.
 The website preview lets you switch fictional applications and inspect sample
-workflow costs. The dashboard demo compares recorded cost and usage events per
-workflow; selecting a plotted run opens its detail. Outcome and price-evidence
-charts summarize only generated events. Unpriced usage remains visibly unknown.
+workflow costs. The dashboard demo Overview charts explicit outcomes or workflow
+status alongside recorded cost or usage-event counts per run. Use the chart
+switches to change the measure; selecting a plotted run opens its detail. The
+evidence strip summarizes outcome and price coverage for the selected generated
+cohort. Unpriced usage remains visibly unknown.
 Motion is optional under the browser's reduced-motion preference.
 
 The demo's **Build a view** page lets visitors add, remove, reorder, and resize
@@ -78,6 +80,10 @@ Starting with a different database creates an independent workspace.
    synthetic demo data to explore the dashboard. New accounts are empty.
 5. Refresh metrics after the application has flushed its exporter. Choose an
    application and cohort to inspect recorded costs, usage, outcomes, and findings.
+   The **Overview** charts show only that selected bounded cohort. Their switches
+   compare outcomes with workflow status, or comparable priced costs with
+   usage-event counts. Select a run in the comparison chart to inspect its steps.
+   **Build a dashboard** opens the saved layout editor for the selected application.
 6. Open **Dashboards**, choose an application, and create a named layout. Add up
    to eight distinct widgets, move them with the arrow buttons, set half or full
    width, and save. Reopen, edit, or delete a layout from the left list. Layouts

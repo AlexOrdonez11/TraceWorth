@@ -1,5 +1,36 @@
 # Local MVP agent workflow
 
+## Visual application overview — September 28, 2026
+
+The owner wants the main dashboard view to benefit from the configurable chart
+work, not only the composer. This bounded milestone upgrades the signed-in
+Overview and public synthetic-demo Overview into clearer visual assessments.
+They must use the same selected application/cohort report, prominently show
+workflow status, outcome coverage, and comparable recorded cost or usage, and
+lead into the saved dashboard creator. Existing workflow details, findings,
+filters, empty states, and received-time/partial-data warnings remain available.
+The public demo remains API-free and labeled synthetic.
+
+| Task | File owner | Acceptance |
+| --- | --- | --- |
+| Overview composition | Developer: `apps/dashboard/src/` | Shared responsive visual summary for signed-in and demo Overviews using recorded cohort values; useful interaction and accessible chart data; clear drill-down into existing workflows and saved dashboards |
+| Independent regression | Testing agent: `tests/` | Browser checks for selected cohort/application changes, exact cost/unknown/outcome interpretation, demo with API blocked, mobile/keyboard, navigation and existing workflow details |
+| Usability review | Reviewer: read-only actual browser | Explore real Overview and demo at desktop/phone widths; check hierarchy, chart interpretation, navigation, empty/partial states, and recovery; report repro and priority |
+
+Status: accepted locally. The coordinator owns docs/integration. The developer
+added shared Overview charts and preserved cohort-scoped report details. The
+independent tester passed 8/8 signed-in builder/browser tests and 14/14 public
+demo/browser tests, including two applications, multiple cohorts, unknown costs,
+chart controls, keyboard/mobile drill-down, and API-free demo behavior. Typecheck
+and build passed. The actual-browser reviewer checked desktop and phone widths;
+their mobile workflow-table scroll cue/focus finding and demo headline finding
+were fixed and retested. There are no remaining blocking usability findings.
+The complete Python suite passed 172 tests with 34 PostgreSQL integration skips
+because no disposable test DSN was configured.
+This does not add a new metric API, inference, forecast, or automatic
+recommendation. Any chart uses the bounded report and explicitly labeled
+recorded values.
+
 ## Configurable dashboard charts — September 28, 2026
 
 The owner clarified that an editable dashboard must let a user choose different
