@@ -48,12 +48,19 @@ To explore the product before registering or connecting an application, open
 a read-only dashboard preview generated from synthetic sample events. It does
 not create an account, application, key, or telemetry, and its values are not
 live measurements. Exit the preview to sign in or create an empty workspace.
-The website preview lets you switch fictional applications and inspect sample
-workflow costs. The dashboard demo Overview charts explicit outcomes or workflow
-status alongside recorded cost or usage-event counts per run. Use the chart
-switches to change the measure; selecting a plotted run opens its detail. The
-evidence strip summarizes outcome and price coverage for the selected generated
-cohort. Unpriced usage remains visibly unknown.
+The website's small synthetic preview is a separate illustrative snapshot; it
+lets you switch fictional applications and inspect sample workflow costs. The
+linked dashboard demo contains three fictional applications and 54 generated
+workflows across 18 days, with three fictional organizations, six client groups,
+and nine users as exploration labels. Filter the sample by those
+contexts; the reported totals, findings, charts, workflow list, and builder
+preview follow the selected slice. These labels do not create account users,
+customer records, or authorization roles. The Overview charts explicit outcomes
+or workflow status, recorded cost or usage-event counts per run, observed daily
+starts, and recorded duration. Use the chart switches to change the measure;
+selecting a plotted run opens its detail. The evidence strip summarizes outcome
+and price coverage for the selected generated slice. Unpriced usage remains
+visibly unknown.
 Motion is optional under the browser's reduced-motion preference.
 
 The demo's **Build a view** page lets visitors add, remove, reorder, and resize
@@ -61,6 +68,12 @@ widgets using the generated report. The layout stays in browser memory and
 resets on reload; it does not call the account API or save a dashboard. Chart
 widgets can show horizontal or vertical bars, a pie, or a trend using compatible
 recorded datasets. Several charts can appear in one layout.
+
+The dashboard sample is reproducible: from the repository root, run
+`.\.venv\Scripts\python.exe scripts/generate_dashboard_demo.py --check` to
+verify the checked-in fixture, or omit `--check` to regenerate it. The script
+creates deterministic synthetic event envelopes and assesses them with the
+same Python assessment engine. It does not read or replace local account data.
 
 The database path is relative to the process working directory. Reuse the same
 file to retain accounts, applications, keys, sessions, events, and dashboard

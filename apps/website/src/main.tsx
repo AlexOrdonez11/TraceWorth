@@ -14,8 +14,8 @@ type SampleWorkflow = {
   description: string;
 };
 
-// This small marketing preview mirrors the generated dashboard fixture. It is
-// illustrative UI content, never telemetry from a connected application.
+// This compact marketing snapshot is separate from the richer generated
+// dashboard fixture. It is illustrative, never connected telemetry.
 const sampleApps: {name: string; workflows: SampleWorkflow[]}[] = [
   {
     name: 'Assistant service',
@@ -91,7 +91,7 @@ function Website() {
               <a className="button lime-button" href={`${dashboard}/#demo`}>Explore the interactive demo <span aria-hidden="true">↗</span></a>
               <a className="landing-ghost-link" href="#how-it-works">See how it works <span aria-hidden="true">↓</span></a>
             </div>
-            <div className="landing-hero-note"><span aria-hidden="true">✳</span> No account needed for the demo. All preview data is synthetic.</div>
+            <div className="landing-hero-note"><span aria-hidden="true">✳</span> No account needed. This small preview is a separate synthetic snapshot; the full demo has more apps and fictional contexts.</div>
           </div>
 
           <div className="preview-window" role="region" aria-label="Interactive synthetic assessment preview">
@@ -110,7 +110,7 @@ function Website() {
               </div>
               <div className="preview-detail" aria-live="polite"><span className="preview-detail-icon" aria-hidden="true">↳</span><div><strong>{workflow.name} · {workflow.outcome}</strong><p>{workflow.description}</p></div></div>
             </div>
-            <div className="preview-footer"><span>Generated example · No connected account data</span><a href={`${dashboard}/#demo`}>Open full demo <span aria-hidden="true">↗</span></a></div>
+            <div className="preview-footer"><span>Small generated snapshot · No connected account data</span><a href={`${dashboard}/#demo`}>Open full demo <span aria-hidden="true">↗</span></a></div>
           </div>
         </div>
       </section>
