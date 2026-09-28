@@ -1,5 +1,34 @@
 # Local MVP agent workflow
 
+## Custom dashboard creator milestone — September 27, 2026
+
+The owner requested a more useful public demo and a tool for users to create
+their own dashboards. This milestone adds a bounded local MVP: signed-in owners
+can save named, application-scoped dashboards assembled from a fixed library of
+report widgets, reorder or remove widgets, reopen and edit a saved view, and
+delete it. The read-only public demo can try layouts in memory but must not
+write to an account or API. Widgets use the bounded received-time assessment;
+unknown costs and partial reports remain explicit. No arbitrary query, HTML,
+cross-account sharing, or automated recommendations are in scope.
+
+| Task | File owner | Acceptance |
+| --- | --- | --- |
+| Account-scoped storage/API | Developer: `src/traceworth/backend/` | Ordered SQLite/PostgreSQL migration; strict widget/name bounds; authenticated CRUD with CSRF and exact origin on mutations; application ownership and cross-account isolation; ingestion keys cannot read or write dashboards |
+| Dashboard creator and demo redesign | Coordinator: `apps/dashboard/src/`, docs | Widget library, add/remove/reorder/edit/save/delete flow, application selection and empty states; demo offers in-memory customization and clearer narrative; cloud UI gates creator until API advertises support |
+| Independent acceptance | Testing agent: `tests/` | CRUD/isolation/CSRF/validation/migration regressions plus actual-browser builder/demo journeys, reload persistence, mobile and no-API public demo |
+| Usability review | Reviewer: read-only actual browser | Check creation, editing, deletion, empty/partial data, application switching, demo clarity, keyboard/mobile use, and recovery from failures |
+
+Status: accepted locally. Independent tests passed 162 cases (34 PostgreSQL
+integration skips without a disposable test DSN); five builder browser cases
+cover persistence, cohort switching, mobile/keyboard operation, demo isolation,
+and failed-save retry. The usability reviewer retested at desktop and phone
+widths with a disposable SQLite database and found no blocking issue. The
+existing staging API remains unchanged until a reviewed migration and separate
+release gate. The static demo refresh was published to the staging dashboard
+CloudFront distribution; its `/#demo` route was checked after invalidation with
+four sample widgets and zero `/api` requests. The hosted authenticated creator
+remains gated until the backend migration and API release.
+
 ## Landing and demo visualization milestone — September 27, 2026
 
 The owner requested a more polished landing page and account-free demo with

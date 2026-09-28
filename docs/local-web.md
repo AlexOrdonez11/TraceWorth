@@ -54,8 +54,13 @@ workflow; selecting a plotted run opens its detail. Outcome and price-evidence
 charts summarize only generated events. Unpriced usage remains visibly unknown.
 Motion is optional under the browser's reduced-motion preference.
 
+The demo's **Build a view** page lets visitors add, remove, reorder, and resize
+widgets using the generated report. The layout stays in browser memory and
+resets on reload; it does not call the account API or save a dashboard.
+
 The database path is relative to the process working directory. Reuse the same
-file to retain accounts, applications, keys, sessions, and events across restarts.
+file to retain accounts, applications, keys, sessions, events, and dashboard
+layouts across restarts.
 Starting with a different database creates an independent workspace.
 
 ## First account and application
@@ -71,6 +76,14 @@ Starting with a different database creates an independent workspace.
    synthetic demo data to explore the dashboard. New accounts are empty.
 5. Refresh metrics after the application has flushed its exporter. Choose an
    application and cohort to inspect recorded costs, usage, outcomes, and findings.
+6. Open **Dashboards**, choose an application, and create a named layout. Add up
+   to eight distinct widgets, move them with the arrow buttons, set half or full
+   width, and save. Reopen, edit, or delete a layout from the left list. Layouts
+   belong to the signed-in account and selected application; they reference the
+   latest bounded report rather than saving a metric snapshot. A new account
+   has no saved dashboards. Choose an environment/configuration on the
+   **Dashboards** page when that application has multiple cohorts; each widget
+   shows only the selected cohort. The 25-dashboard limit applies per account.
 
 Synthetic demo data is scoped to the selected application and labeled
 `synthetic-demo` / `synthetic-v1`. Each explicit seed action appends two new
@@ -131,6 +144,11 @@ required except for HTTP on loopback.
 - `GET /api/metrics?application_id=<application UUID>` returns the current
   account's assessment. Omitting the filter includes its applications only.
   An ingestion key does not authorize reading metrics.
+- `GET/POST /api/dashboards` lists or creates account-owned layouts, with an
+  optional `application_id` list filter. `GET/PUT/DELETE /api/dashboards/{id}`
+  reads, edits, or deletes one layout. Each widget has an allowed `type` and
+  `half` or `full` width. Mutations require the owner session, CSRF token, and
+  allowed origin; ingestion keys cannot access layouts.
 - `POST /api/applications/{id}/demo` is an authenticated, CSRF-protected explicit
   synthetic seed. `GET /api/health` is an unauthenticated health check.
 
@@ -146,7 +164,9 @@ One owner per account is supported. There are no invitations, role management,
 password recovery, email verification, production identity integration, billing,
 or public hosting in this milestone. The API binds to IPv4 loopback and local
 HTTP cookies are not Secure; TLS and deployment hardening are future work.
-SQLite persistence does not make SDK delivery durable. Account isolation is
+SQLite persistence does not make SDK delivery durable. Saved dashboards store
+layout definitions, not arbitrary queries, raw event copies, shared access,
+or automatic recommendations. Account isolation is
 covered by tests, but this local foundation is not a production authentication
 or availability claim. No API for deleting accounts/events is implemented yet.
 

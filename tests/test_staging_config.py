@@ -56,7 +56,7 @@ class StagingConfigurationTests(unittest.TestCase):
                 self.assertTrue(database.ready())
                 with database.connect() as connection:
                     self.assertEqual(connection.execute('SELECT name FROM accounts').fetchone()['name'], 'Retained account')
-                    self.assertEqual({r['version'] for r in connection.execute('SELECT version FROM schema_migrations')}, {1, 2})
+                    self.assertEqual({r['version'] for r in connection.execute('SELECT version FROM schema_migrations')}, {1, 2, 3})
             finally:
                 database.close()
 

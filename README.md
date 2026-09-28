@@ -5,7 +5,8 @@ same API across AI applications. The local MVP captures telemetry and produces
 workflow assessments from JSONL. Automatic provider integrations are not implemented.
 It includes separate React website and dashboard applications backed by a local
 FastAPI API and persistent SQLite storage. Accounts own applications, ingestion
-keys, and metrics. Automatic provider integrations remain planned.
+keys, metrics, and saved application dashboards. The public synthetic demo has
+an in-memory dashboard composer. Automatic provider integrations remain planned.
 
 ## Documentation
 
@@ -14,7 +15,7 @@ keys, and metrics. Automatic provider integrations remain planned.
 - [CI and deployment workflow](docs/ci.md): automated checks, local verification,
   and the path to manually triggered AWS releases.
 - [Run the local web apps](docs/local-web.md): website, account setup, applications,
-  scoped API keys, SDK ingestion, persistent metrics, and legacy JSONL viewer.
+  scoped API keys, SDK ingestion, saved dashboards, and legacy JSONL viewer.
 - [Run the local MVP](docs/local-mvp.md): demo, assessment commands, report fields,
   and current limits.
 - [Agent workflow](docs/agent-workflow.md): coordinator/developer/tester loop and
