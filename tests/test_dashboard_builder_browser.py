@@ -1,6 +1,7 @@
 """Real-browser creator acceptance against an isolated Vite/FastAPI/SQLite stack."""
 
 import json
+from decimal import Decimal
 import os
 from pathlib import Path
 import re
@@ -277,29 +278,33 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         self.page.get_by_label("Application", exact=True).select_option(self.application_id)
         cohort_picker = self.page.get_by_label("Environment / configuration")
         cohort_picker.select_option(label="assistant-service · production · stable")
-        overview = self.page.get_by_role("region", name="What did each run record?")
+        overview = self.page.get_by_role("region", name="What does this cohort show?")
         summary = overview.get_by_label("Selected cohort evidence")
         self.assertIn("1\nrecorded workflows", summary.inner_text())
         self.assertIn("1 / 1\nwith an explicit outcome", summary.inner_text())
         self.assertIn("1 / 1\nusage events with a price", summary.inner_text())
         self.assertIn("0 usage events with unknown cost", summary.inner_text())
-        self.assertIn("0.02 USD", overview.get_by_role("button", name=re.compile("Inspect Run 1")).inner_text())
+        self.assertIn("0.02 USD", overview.locator(".overview-chart-card").filter(
+            has_text="Recorded cost by currency and basis").inner_text())
+        self.assertEqual(overview.get_by_role("article", name="Highest comparable recorded cost").locator("ol button").count(), 1)
         self.assertNotIn("0.03 USD", overview.inner_text())
         self.assertIn("Recorded telemetry", self.page.locator(".source-panel").inner_text())
         self.assertIn("Received-time report", overview.inner_text())
 
         cohort_picker.select_option(label="assistant-service · stage · candidate")
-        overview = self.page.get_by_role("region", name="What did each run record?")
+        overview = self.page.get_by_role("region", name="What does this cohort show?")
         summary = overview.get_by_label("Selected cohort evidence")
         self.assertIn("2\nrecorded workflows", summary.inner_text())
         self.assertIn("1 / 2\nwith an explicit outcome", summary.inner_text())
         self.assertIn("1 / 2\nusage events with a price", summary.inner_text())
         self.assertIn("1 usage event with unknown cost", summary.inner_text())
-        run_rows = overview.get_by_role("group", name="Recorded cost by run · Horizontal bars").get_by_role(
-            "button", name=re.compile("Inspect Run"))
-        self.assertEqual(run_rows.count(), 2)
-        self.assertEqual(sum("0.03 USD" in text for text in run_rows.all_inner_texts()), 1)
-        self.assertEqual(sum("No comparable price" in text for text in run_rows.all_inner_texts()), 1)
+        cost_rank = overview.get_by_role("article", name="Highest comparable recorded cost")
+        self.assertEqual(cost_rank.locator("ol button").count(), 1)
+        self.assertIn("0.03 USD", cost_rank.inner_text())
+        self.assertIn("1 of 2 selected runs excluded", cost_rank.inner_text())
+        self.assertEqual(overview.get_by_role("article", name="Longest recorded duration").locator("ol button").count(), 2)
+        self.assertEqual(overview.get_by_role("article", name="Most usage events").locator("ol button").count(), 2)
+        self.assertIn("1 of 2 recorded usage events include a price", overview.inner_text())
         self.assertNotIn("0.02 USD", overview.inner_text())
         self.assertIn("partial", overview.inner_text().lower())
         outcomes = overview.get_by_role("group", name="Workflow chart view")
@@ -309,7 +314,7 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         self.assertEqual(status_chart.get_by_role("button").count(), 2)
         overview.get_by_text("View chart data").first.click()
         self.assertEqual(overview.get_by_role("region", name="Workflow status data table").get_by_role("row").count(), 3)
-        run_rows.filter(has_text="0.03 USD").click()
+        cost_rank.locator("ol button").first.click()
         dialog = self.page.get_by_role("dialog", name="Workflow details")
         self.assertIn("0.03 USD", dialog.inner_text())
         dialog.get_by_role("button", name="Close").click()
@@ -320,8 +325,8 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         self.page.get_by_label("Application", exact=True).select_option(second_id)
         self.page.get_by_label("Environment / configuration").select_option(
             label="document-indexer · production · stable")
-        overview = self.page.get_by_role("region", name="What did each run record?")
-        self.assertIn("0.07 USD", overview.get_by_role("button", name=re.compile("Inspect Run 1")).inner_text())
+        overview = self.page.get_by_role("region", name="What does this cohort show?")
+        self.assertIn("0.07 USD", overview.get_by_role("article", name="Highest comparable recorded cost").inner_text())
         self.assertNotIn("0.03 USD", overview.inner_text())
         self.assertNotIn("assistant-service", self.page.locator(".source-panel").inner_text())
         self.page.set_viewport_size({"width": 390, "height": 844})
@@ -329,7 +334,7 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         status.focus()
         self.page.keyboard.press("Enter")
         self.assertEqual(status.get_attribute("aria-pressed"), "true")
-        run = overview.get_by_role("button", name=re.compile("Inspect Run 1"))
+        run = overview.get_by_role("article", name="Highest comparable recorded cost").locator("ol button").first
         run.focus()
         self.page.keyboard.press("Enter")
         self.page.get_by_role("dialog", name="Workflow details").get_by_role("button", name="Close").click()
@@ -342,6 +347,78 @@ class DashboardBuilderBrowserAcceptance(unittest.TestCase):
         self.assertTrue(table_region.evaluate("element => element === document.activeElement"))
         self.assertLessEqual(self.page.evaluate("document.documentElement.scrollWidth"),
                              self.page.evaluate("document.documentElement.clientWidth") + 1)
+
+    def test_cost_ranking_uses_exact_decimals_all_rows_and_comparable_group(self):
+        key = self.context.request.post(
+            self.base_url + f"/api/applications/{self.application_id}/keys",
+            data={"name": "Precise ranking fixture"},
+            headers={"Origin": self.base_url, "X-CSRF-Token": self.csrf},
+        )
+        self.assertEqual(key.status, 201, key.text())
+        amounts = [
+            ("rank-a-low", "0.3000000000000000000000000001", "USD"),
+            ("rank-b-high", "0.3000000000000000000000000002", "USD"),
+            ("rank-z-high", "0.3000000000000000000000000002", "USD"),
+            *[(f"rank-{index:02d}", f"0.0{index}", "USD") for index in range(1, 10)],
+            ("rank-tiny", "0." + "0" * 4999 + "1", "USD"),
+            ("rank-other-currency", "10", "ZAR"),
+            ("rank-unknown", None, "USD"),
+        ]
+        events = []
+        for index, (workflow, amount, currency) in enumerate(amounts):
+            root = span(workflow=workflow, duration=100 + index)
+            records = root + [usage(root[0]["step_id"], amount, workflow=workflow, currency=currency)]
+            for record in records:
+                record.update(application_id="assistant-service", environment="ranking",
+                              configuration_id="precise")
+            events.extend(records)
+        sent = self.context.request.post(
+            self.base_url + "/api/events", data={"events": events},
+            headers={"Authorization": "Bearer " + key.json()["token"]},
+        )
+        self.assertEqual(sent.status, 200, sent.text())
+        self.assertEqual(sent.json()["accepted"], len(events))
+        report = self.context.request.get(
+            self.base_url + f"/api/metrics?application_id={self.application_id}")
+        self.assertEqual(report.status, 200, report.text())
+        cohort = next(row for row in report.json()["report"]["cohorts"]
+                      if row["environment"] == "ranking")
+        self.assertEqual(len(cohort["workflows"]), len(amounts))
+        self.assertIn(("ZAR", "estimated"),
+                      [(row["currency"], row["cost_basis"]) for row in cohort["costs"]])
+        expected = sorted(
+            ((row["workflow_id"], sum((Decimal(cost["amount"]) for cost in row["costs"]
+                                      if cost["currency"] == "USD" and cost["cost_basis"] == "estimated"), Decimal(0)))
+             for row in cohort["workflows"] if any(cost["currency"] == "USD" for cost in row["costs"])),
+            key=lambda row: (-row[1], row[0]),
+        )
+        self.assertEqual(len(expected), 13)
+        self.assertEqual([identifier for identifier, _ in expected[:3]],
+                         ["rank-b-high", "rank-z-high", "rank-a-low"])
+
+        self.page.goto(self.base_url)
+        self.page.get_by_label("Application", exact=True).select_option(self.application_id)
+        self.page.get_by_label("Environment / configuration").select_option(
+            label="assistant-service · ranking · precise")
+        overview = self.page.get_by_role("region", name="What does this cohort show?")
+        cost_rank = overview.get_by_role("article", name="Highest comparable recorded cost")
+        self.assertIn("Top 10 of 13 eligible", cost_rank.inner_text())
+        self.assertEqual(cost_rank.locator("ol button").evaluate_all(
+            "rows => rows.map(row => row.dataset.workflowId)"),
+            [identifier for identifier, _ in expected[:10]])
+        self.assertIn("2 of 15 selected runs excluded", cost_rank.inner_text())
+        self.assertIn("Only USD · estimated priced amounts", cost_rank.inner_text())
+        self.assertEqual(overview.get_by_role("article", name="Longest recorded duration").locator("ol button").count(), 10)
+        self.assertEqual(overview.get_by_role("article", name="Most usage events").locator("ol button").count(), 10)
+        self.assertIn("0.3000000000000000000000000002 USD", cost_rank.inner_text())
+        group_select = overview.get_by_label("Comparable cost group")
+        self.assertIn('["ZAR","estimated"]', group_select.locator("option").evaluate_all(
+            "options => options.map(option => option.value)"))
+        group_select.select_option('["ZAR","estimated"]')
+        cost_rank = overview.get_by_role("article", name="Highest comparable recorded cost")
+        self.assertEqual(cost_rank.locator("ol button").evaluate_all(
+            "rows => rows.map(row => row.dataset.workflowId)"), ["rank-other-currency"])
+        self.assertIn("14 of 15 selected runs excluded", cost_rank.inner_text())
 
     def test_failed_save_preserves_layout_and_allows_retry(self):
         self.open_creator()

@@ -55,12 +55,14 @@ workflows across 18 days, with three fictional organizations, six client groups,
 and nine users as exploration labels. Filter the sample by those
 contexts; the reported totals, findings, charts, workflow list, and builder
 preview follow the selected slice. These labels do not create account users,
-customer records, or authorization roles. The Overview charts explicit outcomes
-or workflow status, recorded cost or usage-event counts per run, observed daily
-starts, and recorded duration. Use the chart switches to change the measure;
-selecting a plotted run opens its detail. The evidence strip summarizes outcome
-and price coverage for the selected generated slice. Unpriced usage remains
-visibly unknown.
+customer records, or authorization roles. The Overview starts with aggregate
+workflow outcomes/status, usage price coverage, recorded cost separated by
+currency and basis, root-duration summaries, and observed daily starts. Its
+descriptive observations show the counts behind each statement. Below them,
+three top-10 lists rank comparable recorded cost, recorded duration, and
+usage-event count across the selected slice; select a run to inspect its steps.
+Missing prices and durations are excluded from their rankings, not treated as
+zero. The configurable dashboard builder still supports per-run charts.
 Motion is optional under the browser's reduced-motion preference.
 
 The demo's **Build a view** page lets visitors add, remove, reorder, and resize
@@ -93,9 +95,11 @@ Starting with a different database creates an independent workspace.
    synthetic demo data to explore the dashboard. New accounts are empty.
 5. Refresh metrics after the application has flushed its exporter. Choose an
    application and cohort to inspect recorded costs, usage, outcomes, and findings.
-   The **Overview** charts show only that selected bounded cohort. Their switches
-   compare outcomes with workflow status, or comparable priced costs with
-   usage-event counts. Select a run in the comparison chart to inspect its steps.
+   The **Overview** shows aggregate evidence and descriptive observations for
+   only that selected bounded cohort. Its top-10 lists rank runs by comparable
+   recorded cost, duration, or usage-event count; select a ranked run to inspect
+   its steps. A cost-group selector appears when the cohort has more than one
+   currency or price basis, which are never combined.
    **Build a dashboard** opens the saved layout editor for the selected application.
 6. Open **Dashboards**, choose an application, and create a named layout. Add up
    to eight distinct widgets, move them with the arrow buttons, set half or full
